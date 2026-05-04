@@ -83,10 +83,7 @@ namespace cryfs_cli {
 
     void Cli::_showVersion() {
         cout << "CryFS Version " << gitversion::VersionString() << endl;
-        if (gitversion::IsDevVersion()) {
-            cout << "WARNING! This is a development version based on git commit " << gitversion::GitCommitId() <<
-            ". Please do not use in production!" << endl;
-        } else if (!gitversion::IsStableVersion()) {
+        if (!gitversion::IsDevVersion() && !gitversion::IsStableVersion()) {
             cout << "WARNING! This is an experimental version. Please backup your data frequently!" << endl;
         }
 #ifndef NDEBUG
