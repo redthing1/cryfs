@@ -18,6 +18,7 @@ require_clang_version(7.0)
 
 option(BUILD_TESTING "Build test cases" OFF)
 option(CRYFS_UPDATE_CHECKS "Enable online update and security-vulnerability checks" OFF)
+option(CRYFS_BUILD_BENCHMARKS "Build local benchmark tools" OFF)
 option(DISABLE_OPENMP "Build without OpenMP libraries. This will cause performance degradations." OFF)
 
 # The following options are helpful for development and maintenance.
@@ -47,6 +48,9 @@ include(cmake-utils/Dependencies.cmake)
 add_subdirectory(vendor EXCLUDE_FROM_ALL)
 add_subdirectory(src)
 add_subdirectory(doc)
+if(CRYFS_BUILD_BENCHMARKS)
+  add_subdirectory(bench)
+endif()
 if(BUILD_TESTING)
   enable_testing()
 endif()

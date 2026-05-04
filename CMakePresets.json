@@ -28,6 +28,18 @@
         "BUILD_TESTING": "OFF",
         "CRYFS_UPDATE_CHECKS": "OFF"
       }
+    },
+    {
+      "name": "bench",
+      "displayName": "Bench",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/bench",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "OFF",
+        "CRYFS_UPDATE_CHECKS": "OFF",
+        "CRYFS_BUILD_BENCHMARKS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -38,6 +50,10 @@
     {
       "name": "release",
       "configurePreset": "release"
+    },
+    {
+      "name": "bench",
+      "configurePreset": "bench"
     }
   ],
   "testPresets": [

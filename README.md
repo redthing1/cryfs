@@ -151,6 +151,14 @@ Use the development preset:
     $ cmake --build --preset dev
     $ ctest --preset dev
 
+Run benchmarks
+--------------
+Use the benchmark preset:
+
+    $ cmake --preset bench
+    $ cmake --build --preset bench --target cryfs-bench
+    $ build/bench/bench/cryfs-bench
+
 Building on Windows (experimental)
 ----------------------------------
 1. Install DokanY 2.2.0.1000. Other versions may not work.
