@@ -5,7 +5,7 @@ target_link_libraries(CryfsDependencies_range-v3 INTERFACE range-v3::range-v3)
 
 # Setup boost dependency
 set(Boost_USE_STATIC_LIBS OFF)
-find_package(Boost 1.84.0
+find_package(Boost 1.83.0
         REQUIRED
         COMPONENTS filesystem thread chrono program_options)
 add_library(CryfsDependencies_boost INTERFACE)
@@ -20,10 +20,12 @@ find_package(spdlog REQUIRED)
 add_library(CryfsDependencies_spdlog INTERFACE)
 target_link_libraries(CryfsDependencies_spdlog INTERFACE spdlog::spdlog)
 
-# Setup libcurl dependency
-find_package(CURL REQUIRED)
-add_library(CryfsDependencies_libcurl INTERFACE)
-target_link_libraries(CryfsDependencies_libcurl INTERFACE CURL::libcurl)
+if (CRYFS_UPDATE_CHECKS)
+    # Setup libcurl dependency
+    find_package(CURL REQUIRED)
+    add_library(CryfsDependencies_libcurl INTERFACE)
+    target_link_libraries(CryfsDependencies_libcurl INTERFACE CURL::libcurl)
+endif()
 
 # Setup gtest dependency
 if (BUILD_TESTING)

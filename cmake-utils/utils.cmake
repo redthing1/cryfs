@@ -1,17 +1,15 @@
-include(CheckCXXCompilerFlag)
-
 ###################################################
 #  Activate C++17
 #
 #  Uses: target_activate_cpp17(buildtarget)
 ###################################################
-function(target_activate_cpp14 TARGET)
+function(target_activate_cpp17 TARGET)
     set_property(TARGET ${TARGET} PROPERTY CXX_STANDARD 17)
     set_property(TARGET ${TARGET} PROPERTY CXX_STANDARD_REQUIRED ON)
 
     # We need ENABLE_EXPORTS so that boost::stacktrace works correctly
     set_property(TARGET ${TARGET} PROPERTY ENABLE_EXPORTS 1)
-endfunction(target_activate_cpp14)
+endfunction(target_activate_cpp17)
 
 # Find clang-tidy executable (for use in target_enable_style_warnings)
 if (USE_CLANG_TIDY)

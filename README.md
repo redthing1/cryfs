@@ -89,141 +89,72 @@ Requirements
   - Git (for getting the source code)
   - GCC version >= 7 or Clang >= 7
   - CMake version >= 3.25
+  - Ninja
   - pkg-config (on Unix)
-  - Conan package manager (version 2.x)
+  - Boost development headers/libraries
+  - range-v3
+  - spdlog
   - libFUSE version >= 2.9 (including development headers), on Mac OS X instead install macFUSE from https://osxfuse.github.io/
   - Python >= 3.5
   - OpenMP
+  - GTest/GMock development files if building tests
+  - libcurl development files only if building with `CRYFS_UPDATE_CHECKS=ON`
 
 You can use the following commands to install these requirements
 
     # Ubuntu
-    $ sudo apt install git python3 g++ cmake libomp-dev pkg-config libfuse-dev fuse
+    $ sudo apt install git python3 g++ cmake ninja-build libomp-dev pkg-config libfuse-dev fuse \
+        libboost-filesystem-dev libboost-thread-dev libboost-chrono-dev libboost-program-options-dev \
+        librange-v3-dev libspdlog-dev libgtest-dev libgmock-dev
 
     # Fedora
-    $ sudo dnf install git python3 gcc-c++ cmake pkgconf fuse-devel perl
+    $ sudo dnf install git python3 gcc-c++ cmake ninja-build pkgconf fuse-devel libomp-devel \
+        boost-devel range-v3-devel spdlog-devel gtest-devel gmock-devel
 
     # Macintosh
     # TODO Update the package list
-    $ brew install cmake pkg-config libomp macfuse
-
-To install conan, follow the [official installation instructions](https://docs.conan.io/2/installation.html). The following steps should work on Ubuntu/Debian based systems:
-
-    $ sudo apt install pipx
-    $ pipx install conan~=2.7.0
-    $ pipx ensurepath
-
-Restart your shell so that conan is on your PATH, and then let it find your compiler
-
-    $ conan profile detect
-
-You can edit the generated profile file (usually `~/.conan2/profiles/default`) if you want to use different compiler settings.
-
+    $ brew install cmake ninja pkg-config libomp macfuse boost range-v3 spdlog googletest
 
 Build & Install
 ---------------
-See further below in this README for instructions on how to build a .deb/.rpm package instead of installing CryFS directly.
-
  1. Clone repository
 
-        $ git clone https://github.com/cryfs/cryfs.git cryfs
+        $ git clone <repo-url> cryfs
         $ cd cryfs
-        $ git checkout release/1.0
 
  2. Build
 
-        $ conan build . -s build_type=RelWithDebInfo --build=missing
+        $ cmake --preset release
+        $ cmake --build --preset release
         
-    The executable will be generated at `build/RelWithDebInfo/src/cryfs-cli/cryfs`
+    The executable will be generated at `build/release/src/cryfs-cli/cryfs`.
 
  3. Install
 
-        $ cd build/RelWithDebInfo
-        $ sudo make install
+        $ sudo cmake --install build/release
 
-You can pass the following build types to the *conan build* command (using *-s build_type=value*):
- - **Debug**: No optimizations, debug symbols enabled, assertions enabled
- - **RelWithDebInfo**: Optimizations enabled, debug symbols enabled, assertions enabled
- - **Release**: Optimizations enabled, no debug symbols, no assertions
+The checked-in presets are:
+ - **dev**: Debug build, tests enabled, compile commands exported, update checks disabled
+ - **release**: RelWithDebInfo build, tests disabled, update checks disabled
 
-You can pass the following options to the *conan build* command (using *-o "&:key=value"*):
- - **build_tests**=[True|False]: Whether to build the test cases (can take a long time). Default: False.
- - **update_checks**=[True|False]: Build a CryFS that doesn't check online for updates and security vulnerabilities. Default: True.
- - **disable_openmp**=[True|False]: Disable OpenMP support. Default: False.
+Important CMake options:
+ - **BUILD_TESTING**=[ON|OFF]: Whether to build the test cases. Default: OFF.
+ - **CRYFS_UPDATE_CHECKS**=[ON|OFF]: Enable online update/security checks. Default: OFF.
+ - **DISABLE_OPENMP**=[ON|OFF]: Disable OpenMP support. Default: OFF.
 
 
 Run tests
 ---------
-Follow the build & install steps from above, but add the `-o "&:build_tests=True"` parameter to conan:
+Use the development preset:
 
-    $ conan build . -s build_type=RelWithDebInfo --build=missing -s build_type=Debug -o "&:build_tests=True"
-
-Then run the tests:
-
-    $ cd build/Debug/test
-    $ ./blobstore/blobstore-test
-    $ ./blockstore/blockstore-test
-    $ ./cpp-utils/cpp-utils-test
-    $ ./cryfs/cryfs-test
-    $ ./cryfs-cli/cryfs-cli-test
-    $ ./fspp/fspp-test
-    $ ./gitversion/gitversion-test
-    $ ./parallelaccessstore/parallelaccessstore-test
+    $ cmake --preset dev
+    $ cmake --build --preset dev
+    $ ctest --preset dev
 
 Building on Windows (experimental)
 ----------------------------------
-1. Install conan2. If you want to use "pip install conan", you may have to install Python first.
-2. Install DokanY 2.2.0.1000. Other versions may not work.
-3. Build the project
-
-        $ conan build . --build=missing -o "&:windows_dokany_path=C:/Program Files/Dokan/DokanLibrary-2.2.0"
-
-Using local dependencies
--------------------------------
-Starting with CryFS 0.11, Conan is used for dependency management.
-When you build CryFS, Conan downloads the exact version of each dependency library that was also used for development.
-All dependencies are linked statically, so there should be no incompatibility with locally installed libraries.
-This is the recommended way because it has the highest probability of working correctly.
-
-However, some distributions prefer software packages to be built against dependencies dynamically and against locally installed versions of libraries.
-So if you're building a package for such a distribution, you have the option of doing that, at the cost of potential incompatibilities.
-If you follow this workflow, please make sure to extensively test your build of CryFS.
-You're using a setup that wasn't tested by the CryFS developers.
-
-To use local dependencies, you can install all of CryFS's dependencies (e.g. boost, spdlog) manually and run cmake directly without invoking conan first:
-
-    $ mkdir build
-    $ cd build
-    $ cmake ..
-    $ make
-
-It is recommended to use the same versions of the dependencies as stated in the conanfile.py in this repository.
-It might be useful to take a look at [how our CI setup installs those dependencies](https://github.com/cryfs/cryfs/blob/develop/.github/workflows/actions/install_local_dependencies/action.yaml) to get you started.
-
-CMake will use pkg-config to find those dependencies.
-
-Creating .deb and .rpm packages
--------------------------------
-
-It is recommended to install CryFS using packages, because that allows for an easy way to uninstall it again once you don't need it anymore.
-
-If you want to create a .rpm package, you need to install rpmbuild.
-
- 1. Clone repository
-
-        $ git clone https://github.com/cryfs/cryfs.git cryfs
-        $ cd cryfs
-        $ git checkout release/1.0
-
- 2. Make sure you have the required dependencies
-
-        $ sudo apt install file dpkg-dev rpm
-
- 3. Build
-
-        $ conan build . -s build_type=RelWithDebInfo --build=missing
-        $ cd build/RelWithDebInfo
-        $ make package
+1. Install DokanY 2.2.0.1000. Other versions may not work.
+2. Build the project with CMake and set `DOKAN_PATH` to the Dokan installation directory.
 
 Disclaimer
 ----------------------
