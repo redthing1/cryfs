@@ -1,5 +1,5 @@
 #include "LocalStateDir.h"
-#include <boost/filesystem.hpp>
+#include <cpp-utils/system/AtomicFile.h>
 
 namespace bf = boost::filesystem;
 
@@ -21,8 +21,6 @@ namespace cryfs {
     }
 
     void LocalStateDir::_createDirIfNotExists(const bf::path &path) {
-        if (!bf::exists(path)) {
-            bf::create_directories(path);
-        }
+        cpputils::createDirectoryTreeDurably(path);
     }
 }

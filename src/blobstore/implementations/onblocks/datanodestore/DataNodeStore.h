@@ -45,6 +45,9 @@ public:
   void removeSubtree(uint8_t depth, const blockstore::BlockId &blockId);
   void removeSubtree(cpputils::unique_ref<DataNode> node);
 
+  void flush();
+  void sync();
+
   //TODO Test blocksizeBytes/numBlocks/estimateSpaceForNumBlocksLeft
   uint64_t virtualBlocksizeBytes() const;
   uint64_t numNodes() const;

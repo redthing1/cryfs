@@ -19,7 +19,7 @@ TEST_F(SCryptTest, GeneratedKeyIsReproductible_448) {
     EXPECT_TRUE(keyEquals(derivedKey.key, rederivedKey));
 }
 
-TEST_F(SCryptTest, BackwardsCompatibility_448) {
+TEST_F(SCryptTest, DerivesKnownVector_448) {
     SCrypt scrypt(SCrypt::TestSettings);
     auto kdfParameters = Data::FromString("00040000000000000100000002000000E429AFB0500BD5D172089598B76E6B9ED6D0DDAF3B08F99AA05357F96F4F7823");
     auto rederivedKey = scrypt.deriveExistingKey(56, "mypassword", kdfParameters);
@@ -33,7 +33,7 @@ TEST_F(SCryptTest, GeneratedKeyIsReproductible_256) {
     EXPECT_TRUE(keyEquals(derivedKey.key, rederivedKey));
 }
 
-TEST_F(SCryptTest, BackwardsCompatibility_256) {
+TEST_F(SCryptTest, DerivesKnownVector_256) {
     SCrypt scrypt(SCrypt::TestSettings);
     auto kdfParameters = Data::FromString("000400000000000001000000020000007D65C035E0C4250003A24ED11ABD41F6101DEEC104F6875EE1B808A6683535BD");
     auto rederivedKey = scrypt.deriveExistingKey(32, "mypassword", kdfParameters);
@@ -47,7 +47,7 @@ TEST_F(SCryptTest, GeneratedKeyIsReproductible_128) {
     EXPECT_TRUE(keyEquals(derivedKey.key, rederivedKey));
 }
 
-TEST_F(SCryptTest, BackwardsCompatibility_128) {
+TEST_F(SCryptTest, DerivesKnownVector_128) {
     SCrypt scrypt(SCrypt::TestSettings);
     auto kdfParameters = Data::FromString("000400000000000001000000020000008514339A7F583D80C9865C9EA01B698EE8AEAF99AE5F7AE79C8817D2E73D553D");
     auto rederivedKey = scrypt.deriveExistingKey(16, "mypassword", kdfParameters);
@@ -61,7 +61,7 @@ TEST_F(SCryptTest, GeneratedKeyIsReproductible_DefaultSettings) {
     EXPECT_TRUE(keyEquals(derivedKey.key, rederivedKey));
 }
 
-TEST_F(SCryptTest, BackwardsCompatibility_DefaultSettings) {
+TEST_F(SCryptTest, DerivesKnownVector_DefaultSettings) {
     SCrypt scrypt(SCrypt::DefaultSettings);
     auto kdfParameters = Data::FromString("00001000000000000400000008000000D04ACF9519113E1F4E4D7FB39EFBF257CD71CF8536A468B546C2F5A65C6B622C");
     auto rederivedKey = scrypt.deriveExistingKey(32, "mypassword", kdfParameters);

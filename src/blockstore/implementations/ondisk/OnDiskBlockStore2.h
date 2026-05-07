@@ -23,6 +23,8 @@ public:
   uint64_t estimateNumFreeBytes() const override;
   uint64_t blockSizeFromPhysicalBlockSize(uint64_t blockSize) const override;
   void forEachBlock(std::function<void (const BlockId &)> callback) const override;
+  void flush() override;
+  void sync() override;
 
 private:
   boost::filesystem::path _rootDir;
@@ -31,6 +33,8 @@ private:
   static const std::string FORMAT_VERSION_HEADER;
 
   boost::filesystem::path _getFilepath(const BlockId &blockId) const;
+  void _removeStaleTemporaryBlockFiles();
+  static cpputils::Data _addHeader(const cpputils::Data &data);
   static cpputils::Data _checkAndRemoveHeader(const cpputils::Data &data);
   static bool _isAcceptedCryfsHeader(const cpputils::Data &data);
   static bool _isOtherCryfsHeader(const cpputils::Data &data);

@@ -1,6 +1,7 @@
 #include "FilesystemImpl.h"
 
-#include <fcntl.h>
+#include "OpenFlags.h"
+#include "../fuse/Errno.h"
 #include "../fs_interface/Device.h"
 #include "../fs_interface/Dir.h"
 #include "../fs_interface/Symlink.h"
@@ -32,12 +33,21 @@ using namespace cpputils::logging;
 #define PROFILE(name)
 #endif
 
+namespace {
+void rejectUnsupportedSynchronousOpenFlags(int flags) {
+  if (fspp::impl::hasSynchronousOpenFlag(flags)) {
+    throw fspp::fuse::FuseErrnoException(fspp::fuse::unsupportedOperationErrno());
+  }
+}
+}
+
 FilesystemImpl::FilesystemImpl(cpputils::unique_ref<Device> device)
   :
 #ifdef FSPP_PROFILE
    _loadFileNanosec(0), _loadDirNanosec(0), _loadSymlinkNanosec(0), _openFileNanosec(0), _flushNanosec(0),
    _closeFileNanosec(0), _lstatNanosec(0), _fstatNanosec(0), _chmodNanosec(0), _chownNanosec(0), _truncateNanosec(0),
-   _ftruncateNanosec(0), _readNanosec(0), _writeNanosec(0), _fsyncNanosec(0), _fdatasyncNanosec(0), _accessNanosec(0),
+   _ftruncateNanosec(0), _readNanosec(0), _writeNanosec(0), _fsyncNanosec(0), _fdatasyncNanosec(0),
+   _syncDirNanosec(0), _accessNanosec(0),
    _createAndOpenFileNanosec(0), _createAndOpenFileNanosec_withoutLoading(0), _mkdirNanosec(0),
    _mkdirNanosec_withoutLoading(0), _rmdirNanosec(0), _rmdirNanosec_withoutLoading(0), _unlinkNanosec(0),
    _unlinkNanosec_withoutLoading(0), _renameNanosec(0), _readDirNanosec(0), _readDirNanosec_withoutLoading(0),
@@ -49,6 +59,14 @@ FilesystemImpl::FilesystemImpl(cpputils::unique_ref<Device> device)
 }
 
 FilesystemImpl::~FilesystemImpl() {
+  try {
+    _device->sync();
+  } catch (const std::exception &e) {
+    LOG(ERR, "Failed to sync filesystem during shutdown: {}", e.what());
+  } catch (...) {
+    LOG(ERR, "Failed to sync filesystem during shutdown");
+  }
+
 #ifdef FSPP_PROFILE
   std::ostringstream profilerInformation;
   profilerInformation << "Profiler Information\n"
@@ -69,6 +87,7 @@ FilesystemImpl::~FilesystemImpl() {
     << std::setw(40) << "Write: " << static_cast<double>(_writeNanosec)/1000000000 << "\n"
     << std::setw(40) << "Fsync: " << static_cast<double>(_fsyncNanosec)/1000000000 << "\n"
     << std::setw(40) << "Fdatasync: " << static_cast<double>(_fdatasyncNanosec)/1000000000 << "\n"
+    << std::setw(40) << "SyncDir: " << static_cast<double>(_syncDirNanosec)/1000000000 << "\n"
     << std::setw(40) << "Access: " << static_cast<double>(_accessNanosec)/1000000000 << "\n"
     << std::setw(40) << "CreateAndOpenFile: " << static_cast<double>(_createAndOpenFileNanosec)/1000000000 << "\n"
     << std::setw(40) << "CreateAndOpenFile (without loading): " << static_cast<double>(_createAndOpenFileNanosec_withoutLoading)/1000000000 << "\n"
@@ -123,6 +142,7 @@ unique_ref<Symlink> FilesystemImpl::LoadSymlink(const bf::path &path) {
 }
 
 int FilesystemImpl::openFile(const bf::path &path, int flags) {
+  rejectUnsupportedSynchronousOpenFlags(flags);
   auto file = LoadFile(path);
   return openFile(file.get(), flags);
 }
@@ -237,6 +257,11 @@ void FilesystemImpl::fdatasync(int descriptor) {
   });
 }
 
+void FilesystemImpl::syncDir(const bf::path &path) {
+  PROFILE(_syncDirNanosec);
+  LoadDir(path)->fsync();
+}
+
 void FilesystemImpl::access(const bf::path &path, int mask) {
   PROFILE(_accessNanosec);
   auto node = _device->Load(path);
@@ -247,8 +272,9 @@ void FilesystemImpl::access(const bf::path &path, int mask) {
   }
 }
 
-int FilesystemImpl::createAndOpenFile(const bf::path &path, ::mode_t mode, ::uid_t uid, ::gid_t gid) {
+int FilesystemImpl::createAndOpenFile(const bf::path &path, ::mode_t mode, ::uid_t uid, ::gid_t gid, int flags) {
   PROFILE(_createAndOpenFileNanosec);
+  rejectUnsupportedSynchronousOpenFlags(flags);
   auto dir = LoadDir(path.parent_path());
   PROFILE(_createAndOpenFileNanosec_withoutLoading);
   auto file = dir->createAndOpenFile(path.filename().string(), fspp::mode_t(mode), fspp::uid_t(uid), fspp::gid_t(gid));

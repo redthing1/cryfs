@@ -51,6 +51,7 @@ set(SOURCES
     assert/backtrace_test.cpp
     assert/assert_debug_test.cpp
     system/GetTotalMemoryTest.cpp
+    system/AtomicFileTest.cpp
     system/TimeTest.cpp
 	system/PathTest.cpp
 	system/FiletimeTest.cpp

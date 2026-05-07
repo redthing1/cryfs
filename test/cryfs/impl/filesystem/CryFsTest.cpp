@@ -43,7 +43,7 @@ public:
 
   shared_ptr<CryConfigFile> loadOrCreateConfig() {
     auto keyProvider = make_unique_ref<CryPresetPasswordBasedKeyProvider>("mypassword", make_unique_ref<SCrypt>(SCrypt::TestSettings));
-    return CryConfigLoader(make_shared<NoninteractiveConsole>(mockConsole()), Random::Csprng(), std::move(keyProvider), localStateDir, none, none, none).loadOrCreate(config.path(), false, false).right().configFile;
+    return CryConfigLoader(make_shared<NoninteractiveConsole>(mockConsole()), Random::Csprng(), std::move(keyProvider), localStateDir, none, none).loadOrCreate(config.path(), false).right().configFile;
   }
 
   unique_ref<OnDiskBlockStore2> blockStore() {
@@ -64,10 +64,10 @@ auto failOnIntegrityViolation() {
 
 TEST_F(CryFsTest, CreatedRootdirIsLoadableAfterClosing) {
   {
-    CryDevice dev(loadOrCreateConfig(), blockStore(), localStateDir, 0x12345678, false, false, failOnIntegrityViolation());
+    CryDevice dev(loadOrCreateConfig(), blockStore(), localStateDir, 0x12345678, failOnIntegrityViolation());
     dev.setContext(fspp::Context {fspp::relatime()});
   }
-  CryDevice dev(loadOrCreateConfig(), blockStore(), localStateDir, 0x12345678, false, false, failOnIntegrityViolation());
+  CryDevice dev(loadOrCreateConfig(), blockStore(), localStateDir, 0x12345678, failOnIntegrityViolation());
   dev.setContext(fspp::Context {fspp::relatime()});
   auto rootDir = dev.LoadDir(bf::path("/"));
   rootDir.value()->children();
@@ -75,12 +75,12 @@ TEST_F(CryFsTest, CreatedRootdirIsLoadableAfterClosing) {
 
 TEST_F(CryFsTest, LoadingFilesystemDoesntModifyConfigFile) {
   {
-    CryDevice dev(loadOrCreateConfig(), blockStore(), localStateDir, 0x12345678, false, false, failOnIntegrityViolation());
+    CryDevice dev(loadOrCreateConfig(), blockStore(), localStateDir, 0x12345678, failOnIntegrityViolation());
     dev.setContext(fspp::Context {fspp::relatime()});
   }
   const Data configAfterCreating = Data::LoadFromFile(config.path()).value();
   {
-    CryDevice dev(loadOrCreateConfig(), blockStore(), localStateDir, 0x12345678, false, false, failOnIntegrityViolation());
+    CryDevice dev(loadOrCreateConfig(), blockStore(), localStateDir, 0x12345678, failOnIntegrityViolation());
     dev.setContext(fspp::Context {fspp::relatime()});
   }
   const Data configAfterLoading = Data::LoadFromFile(config.path()).value();

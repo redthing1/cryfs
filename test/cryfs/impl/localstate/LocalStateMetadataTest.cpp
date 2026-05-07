@@ -1,16 +1,19 @@
 #include <gtest/gtest.h>
 
 #include <cryfs/impl/localstate/LocalStateMetadata.h>
+#include <boost/filesystem.hpp>
 #include <cpp-utils/tempfile/TempDir.h>
 #include <fstream>
 #include <cpp-utils/crypto/symmetric/EncryptionKey.h>
 #include <cpp-utils/data/DataFixture.h>
+#include <stdexcept>
 
 using cpputils::TempDir;
 using cpputils::EncryptionKey;
 using cpputils::DataFixture;
 using cryfs::LocalStateMetadata;
 using std::ofstream;
+namespace bf = boost::filesystem;
 
 namespace {
 EncryptionKey generateKey(size_t size, unsigned int seed = 1) {
@@ -36,16 +39,24 @@ TEST_F(LocalStateMetadataTest, myClientId_ValueIsRandomForNewClient) {
     EXPECT_NE(metadata1.myClientId(), metadata2.myClientId());
 }
 
-#ifndef CRYFS_NO_COMPATIBILITY
-TEST_F(LocalStateMetadataTest, myClientId_TakesLegacyValueIfSpecified) {
+TEST_F(LocalStateMetadataTest, myClientId_LegacySidecarIsIgnored) {
   ofstream file((stateDir.path() / "myClientId").string());
   file << 12345u;
   file.close();
 
   const LocalStateMetadata metadata = LocalStateMetadata::loadOrGenerate(stateDir.path(), EncryptionKey::Null(0), false);
-  EXPECT_EQ(12345u, metadata.myClientId());
+  EXPECT_TRUE(bf::exists(stateDir.path() / "metadata"));
+  EXPECT_TRUE(bf::exists(stateDir.path() / "myClientId"));
+  EXPECT_EQ(metadata.myClientId(), LocalStateMetadata::loadOrGenerate(stateDir.path(), EncryptionKey::Null(0), false).myClientId());
 }
-#endif
+
+TEST_F(LocalStateMetadataTest, loadExistingNonRegularMetadataPathThrows) {
+  ASSERT_TRUE(bf::create_directory(stateDir.path() / "metadata"));
+
+  EXPECT_THROW(
+    LocalStateMetadata::loadOrGenerate(stateDir.path(), EncryptionKey::Null(0), false),
+    std::runtime_error);
+}
 
 TEST_F(LocalStateMetadataTest, encryptionKeyHash_whenLoadingWithSameKey_thenDoesntCrash) {
   const auto key = generateKey(1024);

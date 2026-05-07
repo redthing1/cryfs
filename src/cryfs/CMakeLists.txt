@@ -45,6 +45,31 @@ set(LIB_SOURCES
         impl/filesystem/cachingfsblobstore/SymlinkBlobRef.cpp
         impl/filesystem/CryFile.cpp
         impl/filesystem/CryDevice.cpp
+        impl/formatv2/AcceptedRootState.cpp
+        impl/formatv2/DirectoryRecord.cpp
+        impl/formatv2/DirectoryRecordStore.cpp
+        impl/formatv2/FormatV2Device.cpp
+        impl/formatv2/FileRecord.cpp
+        impl/formatv2/FileRecordStore.cpp
+        impl/formatv2/KeyDerivation.cpp
+        impl/formatv2/ObjectMetadata.cpp
+        impl/formatv2/ObjectRecord.cpp
+        impl/formatv2/ObjectTreeValidator.cpp
+        impl/formatv2/RootAuthentication.cpp
+        impl/formatv2/RootContent.cpp
+        impl/formatv2/RootContentStore.cpp
+        impl/formatv2/RootOpen.cpp
+        impl/formatv2/RootOpenWithContent.cpp
+        impl/formatv2/RootOpenWithDirectory.cpp
+        impl/formatv2/RootPublisher.cpp
+        impl/formatv2/RootPublicationStore.cpp
+        impl/formatv2/RootRecord.cpp
+        impl/formatv2/RootSelection.cpp
+        impl/formatv2/RootTransaction.cpp
+        impl/formatv2/SymlinkRecord.cpp
+        impl/formatv2/SymlinkRecordStore.cpp
+        impl/formatv2/Volume.cpp
+        impl/formatv2/VolumePathOperations.cpp
         impl/localstate/LocalStateDir.cpp
         impl/localstate/LocalStateMetadata.cpp
         impl/localstate/BasedirMetadata.cpp

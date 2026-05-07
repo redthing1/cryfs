@@ -119,16 +119,6 @@ TEST_F(ProgramOptionsParserTest, Foreground_True) {
     EXPECT_TRUE(options.foreground());
 }
 
-TEST_F(ProgramOptionsParserTest, AllowFilesystemUpgrade_False) {
-    const ProgramOptions options = parse({"./myExecutable", basedir, "mountdir"});
-    EXPECT_FALSE(options.allowFilesystemUpgrade());
-}
-
-TEST_F(ProgramOptionsParserTest, AllowFilesystemUpgrade_True) {
-    const ProgramOptions options = parse({"./myExecutable", "--allow-filesystem-upgrade", basedir, "mountdir"});
-    EXPECT_TRUE(options.allowFilesystemUpgrade());
-}
-
 TEST_F(ProgramOptionsParserTest, CreateMissingBasedir_False) {
     const ProgramOptions options = parse({"./myExecutable", basedir, "mountdir"});
     EXPECT_FALSE(options.createMissingBasedir());
@@ -224,29 +214,37 @@ TEST_F(ProgramOptionsParserTest, BlocksizeNotGiven) {
     EXPECT_EQ(none, options.blocksizeBytes());
 }
 
-TEST_F(ProgramOptionsParserTest, MissingBlockIsIntegrityViolationGiven_True) {
-    const ProgramOptions options = parse({"./myExecutable", basedir, "--missing-block-is-integrity-violation", "true", mountdir});
-    EXPECT_TRUE(options.missingBlockIsIntegrityViolation().value());
+TEST_F(ProgramOptionsParserTest, MissingBlockIsIntegrityViolationIsRejected) {
+    CaptureStderrRAII captureStderr;
+    try {
+      parse({"./myExecutable", basedir, "--missing-block-is-integrity-violation", "true", mountdir});
+      EXPECT_TRUE(false); // expect throw
+    } catch (const CryfsException& e) {
+      EXPECT_EQ(ErrorCode::InvalidArguments, e.errorCode());
+      captureStderr.EXPECT_MATCHES("Usage:");
+    }
 }
 
-TEST_F(ProgramOptionsParserTest, MissingBlockIsIntegrityViolationGiven_False) {
-    const ProgramOptions options = parse({"./myExecutable", basedir, "--missing-block-is-integrity-violation", "false", mountdir});
-    EXPECT_FALSE(options.missingBlockIsIntegrityViolation().value());
+TEST_F(ProgramOptionsParserTest, ObsoleteIntegrityBypassFlagIsRejected) {
+    CaptureStderrRAII captureStderr;
+    try {
+      parse({"./myExecutable", basedir, "--allow-integrity-violations", mountdir});
+      EXPECT_TRUE(false); // expect throw
+    } catch (const CryfsException& e) {
+      EXPECT_EQ(ErrorCode::InvalidArguments, e.errorCode());
+      captureStderr.EXPECT_MATCHES("Usage:");
+    }
 }
 
-TEST_F(ProgramOptionsParserTest, AllowIntegrityViolations_True) {
-    const ProgramOptions options = parse({"./myExecutable", basedir, "--allow-integrity-violations", mountdir});
-    EXPECT_TRUE(options.allowIntegrityViolations());
-}
-
-TEST_F(ProgramOptionsParserTest, AllowIntegrityViolations_False) {
-    const ProgramOptions options = parse({"./myExecutable", basedir, mountdir});
-    EXPECT_FALSE(options.allowIntegrityViolations());
-}
-
-TEST_F(ProgramOptionsParserTest, MissingBlockIsIntegrityViolationNotGiven) {
-    const ProgramOptions options = parse({"./myExecutable", basedir, mountdir});
-    EXPECT_EQ(none, options.missingBlockIsIntegrityViolation());
+TEST_F(ProgramOptionsParserTest, AllowFilesystemUpgradeIsRejected) {
+    CaptureStderrRAII captureStderr;
+    try {
+      parse({"./myExecutable", basedir, "--allow-filesystem-upgrade", mountdir});
+      EXPECT_TRUE(false); // expect throw
+    } catch (const CryfsException& e) {
+      EXPECT_EQ(ErrorCode::InvalidArguments, e.errorCode());
+      captureStderr.EXPECT_MATCHES("Usage:");
+    }
 }
 
 TEST_F(ProgramOptionsParserTest, FuseOptionGiven) {

@@ -31,10 +31,7 @@ DirBlob::DirBlob(unique_ref<Blob> blob) :
   _readEntriesFromBlob();
 }
 
-DirBlob::~DirBlob() {
-  const std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
-  _writeEntriesToBlob();
-}
+DirBlob::~DirBlob() = default;
 
 void DirBlob::flush() {
   const std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
@@ -85,6 +82,7 @@ void DirBlob::_addChild(const std::string &name, const BlockId &blobId,
     fspp::Dir::EntryType entryType, fspp::mode_t mode, fspp::uid_t uid, fspp::gid_t gid, timespec lastAccessTime, timespec lastModificationTime) {
   _entries.add(name, blobId, entryType, mode, uid, gid, lastAccessTime, lastModificationTime);
   _changed = true;
+  _writeEntriesToBlob();
 }
 
 void DirBlob::AddOrOverwriteChild(const std::string &name, const BlockId &blobId, fspp::Dir::EntryType entryType,
@@ -93,12 +91,14 @@ void DirBlob::AddOrOverwriteChild(const std::string &name, const BlockId &blobId
   const std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
   _entries.addOrOverwrite(name, blobId, entryType, mode, uid, gid, lastAccessTime, lastModificationTime, onOverwritten);
   _changed = true;
+  _writeEntriesToBlob();
 }
 
 void DirBlob::RenameChild(const blockstore::BlockId &blockId, const std::string &newName, std::function<void (const blockstore::BlockId &blockId)> onOverwritten) {
   const std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
   _entries.rename(blockId, newName, onOverwritten);
   _changed = true;
+  _writeEntriesToBlob();
 }
 
 boost::optional<const DirEntry&> DirBlob::GetChild(const string &name) const {
@@ -115,12 +115,14 @@ void DirBlob::RemoveChild(const string &name) {
   const std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
   _entries.remove(name);
   _changed = true;
+  _writeEntriesToBlob();
 }
 
 void DirBlob::RemoveChild(const BlockId &blockId) {
   const std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
   _entries.remove(blockId);
   _changed = true;
+  _writeEntriesToBlob();
 }
 
 void DirBlob::AppendChildrenTo(vector<fspp::Dir::Entry> *result) const {
@@ -139,6 +141,7 @@ void DirBlob::updateAccessTimestampForChild(const BlockId &blockId, fspp::Timest
   const std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
   if (_entries.updateAccessTimestampForChild(blockId, timestampUpdateBehavior)) {
     _changed = true;
+    _writeEntriesToBlob();
   }
 }
 
@@ -146,18 +149,21 @@ void DirBlob::updateModificationTimestampForChild(const BlockId &blockId) {
   const std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
   _entries.updateModificationTimestampForChild(blockId);
   _changed = true;
+  _writeEntriesToBlob();
 }
 
 void DirBlob::chmodChild(const BlockId &blockId, fspp::mode_t mode) {
   const std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
   _entries.setMode(blockId, mode);
   _changed = true;
+  _writeEntriesToBlob();
 }
 
 void DirBlob::chownChild(const BlockId &blockId, fspp::uid_t uid, fspp::gid_t gid) {
   const std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
   if(_entries.setUidGid(blockId, uid, gid)) {
     _changed = true;
+    _writeEntriesToBlob();
   }
 }
 
@@ -165,6 +171,7 @@ void DirBlob::utimensChild(const BlockId &blockId, timespec lastAccessTime, time
   const std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
   _entries.setAccessTimes(blockId, lastAccessTime, lastModificationTime);
   _changed = true;
+  _writeEntriesToBlob();
 }
 
 cpputils::unique_ref<blobstore::Blob> DirBlob::releaseBaseBlob() {

@@ -20,6 +20,7 @@ set(SOURCES
     implementations/onblocks/datatreestore/LeafTraverserTest.cpp
     implementations/onblocks/BlobSizeTest.cpp
     implementations/onblocks/BlobReadWriteTest.cpp
+    implementations/onblocks/BlobStoreSyncTest.cpp
     implementations/onblocks/BigBlobsTest.cpp
 
 )

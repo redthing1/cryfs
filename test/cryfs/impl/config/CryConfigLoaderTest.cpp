@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cryfs/impl/CryfsException.h>
 #include <cryfs/impl/config/CryConfigLoader.h>
 #include <cryfs/impl/config/CryPresetPasswordBasedKeyProvider.h>
 #include "../../impl/testutils/MockConsole.h"
@@ -31,7 +32,6 @@ using std::string;
 using std::ostream;
 using std::shared_ptr;
 using std::make_shared;
-using ::testing::Return;
 using ::testing::HasSubstr;
 
 using namespace cryfs;
@@ -75,17 +75,17 @@ public:
 
     CryConfigLoader loader(const string &password, bool noninteractive, const optional<string> &cipher = none) {
         auto _console = noninteractive ? shared_ptr<Console>(make_shared<NoninteractiveConsole>(console)) : shared_ptr<Console>(console);
-        return CryConfigLoader(_console, cpputils::Random::Csprng(), keyProvider(password), localStateDir, cipher, none, none);
+        return CryConfigLoader(_console, cpputils::Random::Csprng(), keyProvider(password), localStateDir, cipher, none);
     }
 
     unique_ref<CryConfigFile> Create(const string &password = "mypassword", const optional<string> &cipher = none, bool noninteractive = false) {
         EXPECT_FALSE(file.exists());
-        return loader(password, noninteractive, cipher).loadOrCreate(file.path(), false, false).right().configFile;
+        return loader(password, noninteractive, cipher).loadOrCreate(file.path(), false).right().configFile;
     }
 
-    either<CryConfigFile::LoadError, unique_ref<CryConfigFile>> LoadOrCreate(const string &password = "mypassword", const optional<string> &cipher = none, bool noninteractive = false, bool allowFilesystemUpgrade = false) {
+    either<CryConfigFile::LoadError, unique_ref<CryConfigFile>> LoadOrCreate(const string &password = "mypassword", const optional<string> &cipher = none, bool noninteractive = false) {
         EXPECT_TRUE(file.exists());
-        auto loadResult = loader(password, noninteractive, cipher).loadOrCreate(file.path(), allowFilesystemUpgrade, false);
+        auto loadResult = loader(password, noninteractive, cipher).loadOrCreate(file.path(), false);
         if (loadResult.is_left()) {
             return loadResult.left();
         }
@@ -94,7 +94,7 @@ public:
 
     either<CryConfigFile::LoadError, unique_ref<CryConfigFile>> Load(CryConfigFile::Access access = CryConfigFile::Access::ReadWrite) {
         EXPECT_TRUE(file.exists());
-        auto loadResult = loader("mypassword", false, none).load(file.path(), false, false, access);
+        auto loadResult = loader("mypassword", false, none).load(file.path(), false, access);
         if (loadResult.is_left()) {
             return loadResult.left();
         }
@@ -118,21 +118,21 @@ public:
     }
 
     void CreateWithRootBlob(const string &rootBlob, const string &password = "mypassword") {
-        auto cfg = loader(password, false).loadOrCreate(file.path(), false, false).right().configFile;
+        auto cfg = loader(password, false).loadOrCreate(file.path(), false).right().configFile;
         cfg->config()->SetRootBlob(rootBlob);
         cfg->save();
     }
 
     void CreateWithCipher(const string &cipher, const string &password = "mypassword") {
-        auto cfg = loader(password, false).loadOrCreate(file.path(), false, false).right().configFile;
+        auto cfg = loader(password, false).loadOrCreate(file.path(), false).right().configFile;
         cfg->config()->SetCipher(cipher);
         cfg->save();
     }
 
     void CreateWithEncryptionKey(const string &encKey, const string &password = "mypassword") {
         FakeRandomGenerator generator(Data::FromString(encKey));
-        auto loader = CryConfigLoader(console, &generator, keyProvider(password), localStateDir, none, none, none);
-        ASSERT_TRUE(loader.loadOrCreate(file.path(), false, false).is_right());
+        auto loader = CryConfigLoader(console, &generator, keyProvider(password), localStateDir, none, none);
+        ASSERT_TRUE(loader.loadOrCreate(file.path(), false).is_right());
     }
 
     void ChangeEncryptionKey(const string &encKey, const string& password = "mypassword") {
@@ -142,15 +142,15 @@ public:
     }
 
     void CreateWithVersion(const string &version, const string& formatVersion, const string &password = "mypassword") {
-        auto cfg = loader(password, false).loadOrCreate(file.path(), false, false).right().configFile;
+        auto cfg = loader(password, false).loadOrCreate(file.path(), false).right().configFile;
         cfg->config()->SetVersion(formatVersion);
         cfg->config()->SetLastOpenedWithVersion(version);
         cfg->config()->SetCreatedWithVersion(version);
         cfg->save();
     }
-  
+
     void CreateWithFilesystemID(const CryConfig::FilesystemID &filesystemId, const string &password = "mypassword") {
-        auto cfg = loader(password, false).loadOrCreate(file.path(), false, false).right().configFile;
+        auto cfg = loader(password, false).loadOrCreate(file.path(), false).right().configFile;
         cfg->config()->SetFilesystemId(filesystemId);
         cfg->save();
     }
@@ -174,9 +174,10 @@ public:
     }
 
     string newerVersion() {
-        string newerVersion = gitversion::MajorVersion()+"."+std::to_string(std::stol(gitversion::MinorVersion())+2);
+        auto versionInfo = gitversion::Parser::parse(CryConfig::FilesystemFormatVersion);
+        string newerVersion = versionInfo.majorVersion + "." + std::to_string(std::stol(versionInfo.minorVersion) + 2);
         EXPECT_TRUE(gitversion::VersionCompare::isOlderThan(CryConfig::FilesystemFormatVersion, newerVersion))
-            << "Format Version " << CryConfig::FilesystemFormatVersion << " should be older than Git Version " << newerVersion;
+            << "Format Version " << CryConfig::FilesystemFormatVersion << " should be older than test version " << newerVersion;
         return newerVersion;
     }
 
@@ -278,7 +279,7 @@ TEST_F(CryConfigLoaderTest, Cipher_Create) {
 }
 
 TEST_F(CryConfigLoaderTest, Version_Load) {
-    CreateWithVersion("0.9.4", "0.9.4");
+    CreateWithVersion("0.9.4", CryConfig::FilesystemFormatVersion);
     auto loaded = std::move(LoadOrCreate().right());
     EXPECT_EQ(CryConfig::FilesystemFormatVersion, loaded->config()->Version());
     EXPECT_EQ(gitversion::VersionString(), loaded->config()->LastOpenedWithVersion());
@@ -286,7 +287,7 @@ TEST_F(CryConfigLoaderTest, Version_Load) {
 }
 
 TEST_F(CryConfigLoaderTest, Version_Load_IsStoredAndNotOnlyOverwrittenInMemoryOnLoad) {
-    CreateWithVersion("0.9.4", "0.9.4", "mypassword");
+    CreateWithVersion("0.9.4", CryConfig::FilesystemFormatVersion, "mypassword");
     LoadOrCreate().right();
     auto configFile = CryConfigFile::load(file.path(), keyProvider("mypassword").get(), CryConfigFile::Access::ReadWrite).right();
     EXPECT_EQ(CryConfig::FilesystemFormatVersion, configFile->config()->Version());
@@ -313,33 +314,30 @@ TEST_F(CryConfigLoaderTest, FilesystemID_Create) {
     EXPECT_NE(CryConfig::FilesystemID::Null(), created->config()->FilesystemId());
 }
 
-TEST_F(CryConfigLoaderTest, AsksWhenLoadingNewerFilesystem_AnswerYes) {
-    EXPECT_CALL(*console, askYesNo(HasSubstr("should not be opened with older versions"), false)).Times(1).WillOnce(Return(true));
-
+TEST_F(CryConfigLoaderTest, RejectsNewerFilesystemWithoutPrompt) {
     const string version = newerVersion();
     CreateWithVersion(version, version);
-    EXPECT_TRUE(LoadOrCreate().is_right());
-}
-
-TEST_F(CryConfigLoaderTest, AsksWhenLoadingNewerFilesystem_AnswerNo) {
-    EXPECT_CALL(*console, askYesNo(HasSubstr("should not be opened with older versions"), false)).Times(1).WillOnce(Return(false));
-
-    const string version = newerVersion();
-    CreateWithVersion(version, version);
+    EXPECT_CALL(*console, askYesNo(HasSubstr("should not be opened with older versions"), testing::_)).Times(0);
     try {
         LoadOrCreate();
         EXPECT_TRUE(false); // expect throw
-    } catch (const std::runtime_error &e) {
+    } catch (const CryfsException &e) {
+        EXPECT_EQ(ErrorCode::TooNewFilesystemFormat, e.errorCode());
         EXPECT_THAT(e.what(), HasSubstr("Please update your CryFS version."));
     }
 }
 
-TEST_F(CryConfigLoaderTest, AsksWhenMigratingOlderFilesystem) {
-    EXPECT_CALL(*console, askYesNo(HasSubstr("Do you want to attempt a migration now?"), false)).Times(1).WillOnce(Return(true));
-
+TEST_F(CryConfigLoaderTest, RejectsOlderFilesystemWithoutMigrationPrompt) {
     const string version = olderVersion();
     CreateWithVersion(version, version);
-    EXPECT_TRUE(LoadOrCreate().is_right());
+    EXPECT_CALL(*console, askYesNo(HasSubstr("attempt a migration"), testing::_)).Times(0);
+    try {
+        LoadOrCreate();
+        EXPECT_TRUE(false); // expect throw
+    } catch (const CryfsException &e) {
+        EXPECT_EQ(ErrorCode::TooOldFilesystemFormat, e.errorCode());
+        EXPECT_THAT(e.what(), HasSubstr("does not support in-place filesystem format migration"));
+    }
 }
 
 TEST_F(CryConfigLoaderTest, DoesNotAskForMigrationWhenCorrectVersion) {
@@ -349,65 +347,30 @@ TEST_F(CryConfigLoaderTest, DoesNotAskForMigrationWhenCorrectVersion) {
     EXPECT_TRUE(LoadOrCreate().is_right());
 }
 
-TEST_F(CryConfigLoaderTest, DontMigrateWhenAnsweredNo) {
-    EXPECT_CALL(*console, askYesNo(HasSubstr("Do you want to attempt a migration now?"), false)).Times(1).WillOnce(Return(false));
-
-    const string version = olderVersion();
-    CreateWithVersion(version, version);
-    try {
-        LoadOrCreate();
-        EXPECT_TRUE(false); // expect throw
-    } catch (const std::runtime_error &e) {
-        EXPECT_THAT(e.what(), HasSubstr("It has to be migrated."));
-    }
-}
-
 TEST_F(CryConfigLoaderTest, MyClientIdIsIndeterministic) {
     const TempFile file1(false);
     const TempFile file2(false);
-    const uint32_t myClientId = loader("mypassword", true).loadOrCreate(file1.path(), false, false).right().myClientId;
-    EXPECT_NE(myClientId, loader("mypassword", true).loadOrCreate(file2.path(), false, false).right().myClientId);
+    const uint32_t myClientId = loader("mypassword", true).loadOrCreate(file1.path(), false).right().myClientId;
+    EXPECT_NE(myClientId, loader("mypassword", true).loadOrCreate(file2.path(), false).right().myClientId);
 }
 
 TEST_F(CryConfigLoaderTest, MyClientIdIsLoadedCorrectly) {
     const TempFile file(false);
-    const uint32_t myClientId = loader("mypassword", true).loadOrCreate(file.path(), false, false).right().myClientId;
-    EXPECT_EQ(myClientId, loader("mypassword", true).loadOrCreate(file.path(), false, false).right().myClientId);
+    const uint32_t myClientId = loader("mypassword", true).loadOrCreate(file.path(), false).right().myClientId;
+    EXPECT_EQ(myClientId, loader("mypassword", true).loadOrCreate(file.path(), false).right().myClientId);
 }
 
-TEST_F(CryConfigLoaderTest, DoesNotAskForMigrationWhenUpgradesAllowedByProgramArguments_NoninteractiveMode) {
-    EXPECT_CALL(*console, askYesNo(HasSubstr("migrate"), testing::_)).Times(0);
-
-    const string version = olderVersion();
-    CreateWithVersion(version, version);
-    EXPECT_TRUE(LoadOrCreate("mypassword", none, true, true).is_right());
-}
-
-TEST_F(CryConfigLoaderTest, DoesNotAskForMigrationWhenUpgradesAllowedByProgramArguments_InteractiveMode) {
-  EXPECT_CALL(*console, askYesNo(HasSubstr("migrate"), testing::_)).Times(0);
-
-  const string version = olderVersion();
-  CreateWithVersion(version, version);
-  EXPECT_TRUE(LoadOrCreate("mypassword", none, false, true).is_right());
-}
-
-TEST_F(CryConfigLoaderTest, UpdatesConfigFileWithNewVersionWhenMigrated) {
-    EXPECT_CALL(*console, askYesNo(HasSubstr("Do you want to attempt a migration now?"), false)).Times(1).WillOnce(Return(true));
-
-    const string version = olderVersion(); // this triggers a migration which should cause it to modify the config file on load
-    CreateWithVersion(version, version);
+TEST_F(CryConfigLoaderTest, UpdatesConfigFileWithLastOpenedVersionWhenLoadingReadWrite) {
+    CreateWithVersion("0.9.4", CryConfig::FilesystemFormatVersion);
 
     expectLoadingModifiesFile(CryConfigFile::Access::ReadWrite);
 
-    // If we load it again, it shouldn't modify again because it's already updated
+    // If we load it again, it shouldn't modify again because last-opened is current.
     expectLoadingDoesntModifyFile(CryConfigFile::Access::ReadWrite);
 }
 
-TEST_F(CryConfigLoaderTest, DoesntUpdatesConfigFileWithNewVersionWhenLoadingReadOnly) {
-    EXPECT_CALL(*console, askYesNo(HasSubstr("Do you want to attempt a migration now?"), false)).Times(1).WillOnce(Return(true));
-
-    const string version = olderVersion(); // this triggers a migration which usually would cause it to modify the config file on load
-    CreateWithVersion(version, version);
+TEST_F(CryConfigLoaderTest, DoesntUpdateConfigFileWithLastOpenedVersionWhenLoadingReadOnly) {
+    CreateWithVersion("0.9.4", CryConfig::FilesystemFormatVersion);
 
     expectLoadingDoesntModifyFile(CryConfigFile::Access::ReadOnly);
 }

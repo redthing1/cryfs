@@ -8,9 +8,6 @@
 #include "FileBlob.h"
 #include "DirBlob.h"
 #include "SymlinkBlob.h"
-#ifndef CRYFS_NO_COMPATIBILITY
-#include <cpp-utils/process/SignalCatcher.h>
-#endif
 
 namespace cryfs {
     namespace fsblobstore {
@@ -26,20 +23,14 @@ namespace cryfs {
             boost::optional<cpputils::unique_ref<FsBlob>> load(const blockstore::BlockId &blockId);
             void remove(cpputils::unique_ref<FsBlob> blob);
             void remove(const blockstore::BlockId &blockId);
+            void flush();
+            void sync();
             uint64_t numBlocks() const;
             uint64_t estimateSpaceForNumBlocksLeft() const;
 
             uint64_t virtualBlocksizeBytes() const;
 
-#ifndef CRYFS_NO_COMPATIBILITY
-            static cpputils::unique_ref<FsBlobStore> migrate(cpputils::unique_ref<blobstore::BlobStore> blobStore, const blockstore::BlockId &blockId);
-#endif
-
         private:
-
-#ifndef CRYFS_NO_COMPATIBILITY
-            void _migrate(cpputils::unique_ref<blobstore::Blob> node, const blockstore::BlockId &parentId, cpputils::SignalCatcher* signalCatcher, std::function<void(uint32_t numNodes)> perBlobCallback);
-#endif
 
             std::function<fspp::num_bytes_t(const blockstore::BlockId &)> _getLstatSize();
 
@@ -81,6 +72,14 @@ namespace cryfs {
 
         inline void FsBlobStore::remove(const blockstore::BlockId &blockId) {
             _baseBlobStore->remove(blockId);
+        }
+
+        inline void FsBlobStore::flush() {
+            return _baseBlobStore->flush();
+        }
+
+        inline void FsBlobStore::sync() {
+            return _baseBlobStore->sync();
         }
 
         inline uint64_t FsBlobStore::virtualBlocksizeBytes() const {

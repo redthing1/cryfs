@@ -17,9 +17,29 @@ namespace blockstore {
 
         class KnownBlockVersions final {
         public:
+            class BlockStateRollback final {
+            public:
+                BlockStateRollback(KnownBlockVersions *knownVersions, const BlockId &blockId);
+                ~BlockStateRollback();
+
+                void commit();
+
+            private:
+                KnownBlockVersions *_knownVersions;
+                BlockId _blockId;
+                boost::optional<uint64_t> _myVersion;
+                boost::optional<uint32_t> _lastUpdateClientId;
+                bool _dirty;
+                bool _committed;
+
+                DISALLOW_COPY_AND_ASSIGN(BlockStateRollback);
+            };
+
             KnownBlockVersions(const boost::filesystem::path &stateFilePath, uint32_t myClientId);
             KnownBlockVersions(KnownBlockVersions &&rhs); // NOLINT (intentionally not noexcept)
             ~KnownBlockVersions();
+
+            BlockStateRollback rollbackOnFailure(const BlockId &blockId);
 
 			WARN_UNUSED_RESULT
             bool checkAndUpdateVersion(uint32_t clientId, const BlockId &blockId, uint64_t version);
@@ -38,6 +58,7 @@ namespace blockstore {
 
             bool integrityViolationOnPreviousRun() const;
             void setIntegrityViolationOnPreviousRun(bool value);
+            void save() const;
 
             static constexpr uint32_t CLIENT_ID_FOR_DELETED_BLOCK = 0;
 
@@ -49,13 +70,18 @@ namespace blockstore {
             boost::filesystem::path _stateFilePath;
             uint32_t _myClientId;
             mutable std::mutex _mutex;
+            mutable bool _dirty;
             bool _valid;
 
-            static const std::string OLD_HEADER;
             static const std::string HEADER;
 
             void _loadStateFile();
             void _saveStateFile() const;
+            void _restoreBlockState(
+                const BlockId &blockId,
+                const boost::optional<uint64_t> &myVersion,
+                const boost::optional<uint32_t> &lastUpdateClientId,
+                bool dirty);
 
             static std::unordered_map<ClientIdAndBlockId, uint64_t> _deserializeKnownVersions(cpputils::Deserializer *deserializer);
             static void _serializeKnownVersions(cpputils::Serializer *serializer, const std::unordered_map<ClientIdAndBlockId, uint64_t>& knownVersions);

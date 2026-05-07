@@ -32,8 +32,9 @@ public:
   MOCK_METHOD(void, flush, (int), (override));
   MOCK_METHOD(void, fsync, (int), (override));
   MOCK_METHOD(void, fdatasync, (int), (override));
+  MOCK_METHOD(void, syncDir, (const boost::filesystem::path&), (override));
   MOCK_METHOD(void, access, (const boost::filesystem::path&, int), (override));
-  MOCK_METHOD(int, createAndOpenFile, (const boost::filesystem::path&, mode_t, uid_t, gid_t), (override));
+  MOCK_METHOD(int, createAndOpenFile, (const boost::filesystem::path&, mode_t, uid_t, gid_t, int), (override));
   MOCK_METHOD(void, mkdir, (const boost::filesystem::path&, mode_t, uid_t, gid_t), (override));
   MOCK_METHOD(void, rmdir, (const boost::filesystem::path&), (override));
   MOCK_METHOD(void, unlink, (const boost::filesystem::path&), (override));

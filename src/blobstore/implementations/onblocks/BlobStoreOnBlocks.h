@@ -25,6 +25,9 @@ public:
   void remove(cpputils::unique_ref<Blob> blob) override;
   void remove(const blockstore::BlockId &blockId) override;
 
+  void flush() override;
+  void sync() override;
+
   //TODO Test blocksizeBytes/numBlocks/estimateSpaceForNumBlocksLeft
   //virtual means "space we can use" as opposed to "space it takes on the disk" (i.e. virtual is without headers, checksums, ...)
   uint64_t virtualBlocksizeBytes() const override;

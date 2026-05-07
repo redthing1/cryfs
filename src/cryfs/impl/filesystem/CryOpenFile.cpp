@@ -62,11 +62,13 @@ void CryOpenFile::fsync() {
   _device->callFsActionCallbacks();
   _fileBlob->flush();
   _parent->flush();
+  _device->sync();
 }
 
 void CryOpenFile::fdatasync() {
   _device->callFsActionCallbacks();
   _fileBlob->flush();
+  _device->sync();
 }
 
 fspp::TimestampUpdateBehavior CryOpenFile::timestampUpdateBehavior() const {

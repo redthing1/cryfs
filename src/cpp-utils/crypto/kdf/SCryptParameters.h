@@ -58,13 +58,6 @@ namespace cpputils {
         cpputils::Data serialize() const;
         static SCryptParameters deserialize(const cpputils::Data &data);
 
-#ifndef CRYFS_NO_COMPATIBILITY
-        static SCryptParameters deserializeOldFormat(cpputils::Deserializer *deserializer);
-        size_t serializedSize() const {
-            return _serializedSize();
-        }
-#endif
-
     private:
         size_t _serializedSize() const;
 

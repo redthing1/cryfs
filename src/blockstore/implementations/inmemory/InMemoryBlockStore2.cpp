@@ -91,5 +91,11 @@ void InMemoryBlockStore2::forEachBlock(std::function<void (const BlockId &)> cal
   }
 }
 
+void InMemoryBlockStore2::flush() {
+}
+
+void InMemoryBlockStore2::sync() {
+}
+
 }
 }

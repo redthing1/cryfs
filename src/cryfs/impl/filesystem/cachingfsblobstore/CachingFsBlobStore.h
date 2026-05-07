@@ -25,6 +25,8 @@ namespace cryfs {
             boost::optional<cpputils::unique_ref<FsBlobRef>> load(const blockstore::BlockId &blockId);
             void remove(cpputils::unique_ref<FsBlobRef> blob);
             void remove(const blockstore::BlockId &blockId);
+            void flush();
+            void sync();
             uint64_t virtualBlocksizeBytes() const;
             uint64_t numBlocks() const;
             uint64_t estimateSpaceForNumBlocksLeft() const;
@@ -94,6 +96,16 @@ namespace cryfs {
         inline void CachingFsBlobStore::releaseForCache(cpputils::unique_ref<fsblobstore::FsBlob> baseBlob) {
             const blockstore::BlockId blockId = baseBlob->blockId();
             _cache.push(blockId, std::move(baseBlob));
+        }
+
+        inline void CachingFsBlobStore::flush() {
+            _cache.flush();
+            return _baseBlobStore->flush();
+        }
+
+        inline void CachingFsBlobStore::sync() {
+            flush();
+            return _baseBlobStore->sync();
         }
 
         inline uint64_t CachingFsBlobStore::virtualBlocksizeBytes() const {

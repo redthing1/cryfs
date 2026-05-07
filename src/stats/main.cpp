@@ -64,7 +64,7 @@ unique_ref<BlockStore> makeBlockStore(const path& basedir, const CryConfigLoader
     auto onIntegrityViolation = [] () {
         std::cerr << "Warning: Integrity violation encountered" << std::endl;
     };
-    auto integrityBlockStore = make_unique_ref<IntegrityBlockStore2>(std::move(encryptedBlockStore), integrityFilePath, config.myClientId, false, true, onIntegrityViolation);
+    auto integrityBlockStore = make_unique_ref<IntegrityBlockStore2>(std::move(encryptedBlockStore), integrityFilePath, config.myClientId, onIntegrityViolation);
     return make_unique_ref<LowToHighLevelBlockStore>(std::move(integrityBlockStore));
 }
 
@@ -156,18 +156,6 @@ void printConfig(const CryConfig& config) {
         << "\n- Blocksize: " << config.BlocksizeBytes() << " bytes"
         << "\n- Filesystem Id: " << config.FilesystemId().ToString()
         << "\n- Root Blob Id: " << config.RootBlob();
-    if (config.missingBlockIsIntegrityViolation()) {
-        ASSERT(config.ExclusiveClientId() != boost::none, "ExclusiveClientId must be set if missingBlockIsIntegrityViolation");
-        std::cout << "\n- Extended integrity measures: enabled."
-               "\n  - Exclusive client id: " << *config.ExclusiveClientId();
-    } else {
-        ASSERT(config.ExclusiveClientId() == boost::none, "ExclusiveClientId must be unset if !missingBlockIsIntegrityViolation");
-        std::cout << "\n- Extended integrity measures: disabled.";
-    }
-#ifndef CRYFS_NO_COMPATIBILITY
-    std::cout << "\n- Has parent pointers: " << (config.HasParentPointers() ? "yes" : "no");
-    std::cout << "\n- Has version numbers: " << (config.HasVersionNumbers() ? "yes" : "no");
-#endif
     std::cout << "\n----------------------------------------------------\n";
 }
 
@@ -194,9 +182,9 @@ int main(int argc, char* argv[]) {
 
     auto config_path = basedir / "cryfs.config";
     LocalStateDir localStateDir(cpputils::system::HomeDirectory::getXDGDataDir() / "cryfs");
-    CryConfigLoader config_loader(console, Random::OSRandom(), std::move(keyProvider), localStateDir, boost::none, boost::none, boost::none);
+    CryConfigLoader config_loader(console, Random::OSRandom(), std::move(keyProvider), localStateDir, boost::none, boost::none);
 
-    auto config = config_loader.load(config_path, false, true, CryConfigFile::Access::ReadOnly);
+    auto config = config_loader.load(config_path, true, CryConfigFile::Access::ReadOnly);
     if (config.is_left()) {
         switch (config.left()) {
             case CryConfigFile::LoadError::ConfigFileNotFound:
@@ -208,13 +196,9 @@ int main(int argc, char* argv[]) {
     const auto& config_ = config.right().configFile->config();
     std::cout << "Loading filesystem" << std::endl;
     printConfig(*config_);
-#ifndef CRYFS_NO_COMPATIBILITY
-    const bool is_correct_format = config_->Version() == CryConfig::FilesystemFormatVersion && config_->HasParentPointers() && config_->HasVersionNumbers();
-#else
     const bool is_correct_format = config_->Version() == CryConfig::FilesystemFormatVersion;
-#endif
     if (!is_correct_format) {
-        std::cerr << "The filesystem is not in the 0.10 format. It needs to be migrated. The cryfs-stats tool unfortunately can't handle this, please mount and unmount the filesystem once." << std::endl;
+        std::cerr << "The filesystem is not in the supported hard-fork format." << std::endl;
         exit(1);
     }
 

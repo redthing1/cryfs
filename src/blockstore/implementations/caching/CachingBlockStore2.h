@@ -5,7 +5,6 @@
 #include "../../interface/BlockStore2.h"
 #include <cpp-utils/macros.h>
 #include "../caching/cache/Cache.h"
-#include <unordered_set>
 
 namespace blockstore {
 namespace caching {
@@ -22,24 +21,18 @@ public:
   uint64_t estimateNumFreeBytes() const override;
   uint64_t blockSizeFromPhysicalBlockSize(uint64_t blockSize) const override;
   void forEachBlock(std::function<void (const BlockId &)> callback) const override;
-
-  void flush();
+  void flush() override;
+  void sync() override;
 
 private:
-  // TODO Is a cache implementation with onEvict callback instead of destructor simpler?
   class CachedBlock final {
   public:
-    CachedBlock(const CachingBlockStore2* blockStore, const BlockId &blockId, cpputils::Data data, bool isDirty);
-    ~CachedBlock();
+    explicit CachedBlock(cpputils::Data data);
 
     const cpputils::Data& read() const;
     void write(cpputils::Data data);
-    void markNotDirty() &&; // only on rvalue because the destructor should be called after calling markNotDirty(). It shouldn't be put back into the cache.
   private:
-    const CachingBlockStore2* _blockStore;
-    BlockId _blockId;
     cpputils::Data _data;
-    bool _dirty;
 
     DISALLOW_COPY_AND_ASSIGN(CachedBlock);
   };
@@ -47,11 +40,8 @@ private:
   boost::optional<cpputils::unique_ref<CachedBlock>> _loadFromCacheOrBaseStore(const BlockId &blockId) const;
 
   cpputils::unique_ref<BlockStore2> _baseBlockStore;
-  friend class CachedBlock;
 
   // TODO Store CachedBlock directly, without unique_ref
-  mutable std::mutex _cachedBlocksNotInBaseStoreMutex;
-  mutable std::unordered_set<BlockId> _cachedBlocksNotInBaseStore;
   mutable Cache<BlockId, cpputils::unique_ref<CachedBlock>, 1000> _cache;
 
 public:

@@ -89,6 +89,15 @@ void DataNodeStore::remove(const BlockId &blockId) {
   _blockstore->remove(blockId);
 }
 
+void DataNodeStore::flush() {
+  _blockstore->flush();
+}
+
+void DataNodeStore::sync() {
+  flush();
+  _blockstore->sync();
+}
+
 void DataNodeStore::removeSubtree(unique_ref<DataNode> node) {
   auto leaf = dynamic_pointer_move<DataLeafNode>(node);
   if (leaf != none) {

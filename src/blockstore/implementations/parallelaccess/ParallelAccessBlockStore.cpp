@@ -86,5 +86,13 @@ void ParallelAccessBlockStore::forEachBlock(std::function<void (const BlockId &)
   return _baseBlockStore->forEachBlock(callback);
 }
 
+void ParallelAccessBlockStore::flush() {
+  return _baseBlockStore->flush();
+}
+
+void ParallelAccessBlockStore::sync() {
+  return _baseBlockStore->sync();
+}
+
 }
 }

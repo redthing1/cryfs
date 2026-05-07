@@ -21,6 +21,13 @@ public:
   virtual void remove(cpputils::unique_ref<Blob> blob) = 0;
   virtual void remove(const blockstore::BlockId &blockId) = 0;
 
+  // Push dirty in-process state to the next lower storage layer. This does not
+  // by itself promise host-storage durability.
+  virtual void flush() = 0;
+
+  // Make all prior changes durable at this store's persistence boundary.
+  virtual void sync() = 0;
+
   virtual uint64_t numBlocks() const = 0;
   virtual uint64_t estimateSpaceForNumBlocksLeft() const = 0;
   //virtual means "space we can use" as opposed to "space it takes on the disk" (i.e. virtual is without headers, checksums, ...)

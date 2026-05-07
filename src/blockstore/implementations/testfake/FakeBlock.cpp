@@ -5,12 +5,6 @@
 #include <cpp-utils/data/DataUtils.h>
 
 using std::shared_ptr;
-using std::istream;
-using std::ostream;
-using std::ifstream;
-using std::ofstream;
-using std::ios;
-using std::string;
 using cpputils::Data;
 
 namespace blockstore {

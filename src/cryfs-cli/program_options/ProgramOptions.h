@@ -14,14 +14,12 @@ namespace cryfs_cli {
         public:
             ProgramOptions(boost::filesystem::path baseDir, boost::filesystem::path mountDir,
                            boost::optional<boost::filesystem::path> configFile,
-                           bool foreground, bool allowFilesystemUpgrade, bool allowReplacedFilesystem,
+                           bool foreground, bool allowReplacedFilesystem,
                            bool createMissingBasedir, bool createMissingMountpoint,
                            boost::optional<double> unmountAfterIdleMinutes,
                            boost::optional<boost::filesystem::path> logFile,
                            boost::optional<std::string> cipher,
                            boost::optional<uint32_t> blocksizeBytes,
-                           bool allowIntegrityViolations,
-                           boost::optional<bool> missingBlockIsIntegrityViolation,
                            std::vector<std::string> fuseOptions);
             ProgramOptions(ProgramOptions &&rhs) = default;
 
@@ -29,7 +27,6 @@ namespace cryfs_cli {
             const boost::filesystem::path &mountDir() const;
             const boost::optional<boost::filesystem::path> &configFile() const;
             bool foreground() const;
-            bool allowFilesystemUpgrade() const;
             bool allowReplacedFilesystem() const;
             bool createMissingBasedir() const;
             bool createMissingMountpoint() const;
@@ -37,8 +34,6 @@ namespace cryfs_cli {
             const boost::optional<boost::filesystem::path> &logFile() const;
             const boost::optional<std::string> &cipher() const;
             const boost::optional<uint32_t> &blocksizeBytes() const;
-            bool allowIntegrityViolations() const;
-            const boost::optional<bool> &missingBlockIsIntegrityViolation() const;
             const std::vector<std::string> &fuseOptions() const;
 			bool mountDirIsDriveLetter() const;
 
@@ -47,7 +42,6 @@ namespace cryfs_cli {
             boost::filesystem::path _mountDir; // this is absolute iff !_mountDirIsDriveLetter
 			boost::optional<boost::filesystem::path> _configFile;
             bool _foreground;
-            bool _allowFilesystemUpgrade;
             bool _allowReplacedFilesystem;
             bool _createMissingBasedir;
             bool _createMissingMountpoint;
@@ -55,8 +49,6 @@ namespace cryfs_cli {
             boost::optional<boost::filesystem::path> _logFile;
             boost::optional<std::string> _cipher;
             boost::optional<uint32_t> _blocksizeBytes;
-            bool _allowIntegrityViolations;
-            boost::optional<bool> _missingBlockIsIntegrityViolation;
             std::vector<std::string> _fuseOptions;
 			bool _mountDirIsDriveLetter;
 

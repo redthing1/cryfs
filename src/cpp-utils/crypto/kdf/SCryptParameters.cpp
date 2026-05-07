@@ -26,14 +26,4 @@ namespace cpputils {
         deserializer.finished();
         return SCryptParameters(std::move(salt), n, r, p);
     }
-
-#ifndef CRYFS_NO_COMPATIBILITY
-    SCryptParameters SCryptParameters::deserializeOldFormat(Deserializer *source) {
-        const uint64_t n = source->readUint64();
-        const uint32_t r = source->readUint32();
-        const uint32_t p = source->readUint32();
-        Data salt = source->readData();
-        return SCryptParameters(std::move(salt), n, r, p);
-    }
-#endif
 }

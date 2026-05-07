@@ -43,10 +43,6 @@ class CryConfigConsoleTest_Cipher: public CryConfigConsoleTest {};
   EXPECT_CALL(*console, askYesNo("Use default settings?", testing::_)).Times(1).WillOnce(Return(false));                        \
   EXPECT_CALL(*console, ask(HasSubstr("block size"), testing::_)).Times(1)
 
-#define EXPECT_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION()                                                              \
-  EXPECT_CALL(*console, askYesNo("Use default settings?", testing::_)).Times(1).WillOnce(Return(false));                        \
-  EXPECT_CALL(*console, askYesNo(HasSubstr("missing block"), testing::_)).Times(1)
-
 TEST_F(CryConfigConsoleTest_Cipher, AsksForCipher) {
     EXPECT_ASK_FOR_CIPHER().WillOnce(ChooseAnyCipher());
     cryconsole.askCipher();
@@ -69,11 +65,6 @@ TEST_F(CryConfigConsoleTest_Cipher, ChooseDefaultCipherWhenNoninteractiveEnviron
 TEST_F(CryConfigConsoleTest_Cipher, AsksForBlocksize) {
     EXPECT_ASK_FOR_BLOCKSIZE().WillOnce(Return(0));
     cryconsole.askBlocksizeBytes();
-}
-
-TEST_F(CryConfigConsoleTest_Cipher, AsksForMissingBlockIsIntegrityViolation) {
-    EXPECT_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION().WillOnce(Return(true));
-    cryconsole.askMissingBlockIsIntegrityViolation();
 }
 
 TEST_F(CryConfigConsoleTest_Cipher, ChooseDefaultBlocksizeWhenNoninteractiveEnvironment) {

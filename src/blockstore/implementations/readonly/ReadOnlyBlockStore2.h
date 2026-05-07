@@ -30,6 +30,8 @@ public:
   uint64_t estimateNumFreeBytes() const override;
   uint64_t blockSizeFromPhysicalBlockSize(uint64_t blockSize) const override;
   void forEachBlock(std::function<void (const BlockId &)> callback) const override;
+  void flush() override;
+  void sync() override;
 
 private:
   cpputils::unique_ref<BlockStore2> _baseBlockStore;
@@ -71,6 +73,14 @@ inline uint64_t ReadOnlyBlockStore2::blockSizeFromPhysicalBlockSize(uint64_t blo
 
 inline void ReadOnlyBlockStore2::forEachBlock(std::function<void (const BlockId &)> callback) const {
   return _baseBlockStore->forEachBlock(std::move(callback));
+}
+
+inline void ReadOnlyBlockStore2::flush() {
+  return _baseBlockStore->flush();
+}
+
+inline void ReadOnlyBlockStore2::sync() {
+  return _baseBlockStore->sync();
 }
 
 }

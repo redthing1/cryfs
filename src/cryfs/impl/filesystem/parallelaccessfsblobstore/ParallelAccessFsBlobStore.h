@@ -26,6 +26,8 @@ namespace cryfs {
             cpputils::unique_ref<SymlinkBlobRef> createSymlinkBlob(const boost::filesystem::path &target, const blockstore::BlockId &parent);
             boost::optional<cpputils::unique_ref<FsBlobRef>> load(const blockstore::BlockId &blockId);
             void remove(cpputils::unique_ref<FsBlobRef> blob);
+            void flush();
+            void sync();
             uint64_t virtualBlocksizeBytes() const;
             uint64_t numBlocks() const;
             uint64_t estimateSpaceForNumBlocksLeft() const;
@@ -48,6 +50,14 @@ namespace cryfs {
         inline void ParallelAccessFsBlobStore::remove(cpputils::unique_ref<FsBlobRef> blob) {
             const blockstore::BlockId blockId = blob->blockId();
             return _parallelAccessStore.remove(blockId, std::move(blob));
+        }
+
+        inline void ParallelAccessFsBlobStore::flush() {
+            return _baseBlobStore->flush();
+        }
+
+        inline void ParallelAccessFsBlobStore::sync() {
+            return _baseBlobStore->sync();
         }
 
         inline uint64_t ParallelAccessFsBlobStore::virtualBlocksizeBytes() const {

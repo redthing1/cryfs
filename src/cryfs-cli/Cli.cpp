@@ -1,22 +1,21 @@
 #include "Cli.h"
 
-#include <blockstore/implementations/ondisk/OnDiskBlockStore2.h>
-#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cpp-utils/assert/backtrace.h>
 
+#include <fspp/fs_interface/Dir.h>
 #include <fspp/fuse/Fuse.h>
 #include <fspp/impl/FilesystemImpl.h>
 #include <cpp-utils/process/subprocess.h>
 #include <cpp-utils/io/DontEchoStdinToStdoutRAII.h>
-#include <cryfs/impl/filesystem/CryDevice.h>
 #include <cryfs/impl/config/CryConfigLoader.h>
 #include <cryfs/impl/config/CryPasswordBasedKeyProvider.h>
+#include <cryfs/impl/formatv2/FormatV2Device.h>
+#include <cryfs/impl/formatv2/Volume.h>
 #include "program_options/Parser.h"
 #include <boost/filesystem.hpp>
 
-#include <cryfs/impl/filesystem/CryDir.h>
 #include <gitversion/gitversion.h>
 
 #include "VersionChecker.h"
@@ -36,7 +35,6 @@ using namespace cryfs;
 namespace bf = boost::filesystem;
 using namespace cpputils::logging;
 
-using blockstore::ondisk::OnDiskBlockStore2;
 using program_options::ProgramOptions;
 
 using cpputils::make_unique_ref;
@@ -59,9 +57,6 @@ using std::make_unique;
 using std::function;
 using boost::optional;
 using boost::none;
-using boost::chrono::minutes;
-using boost::chrono::milliseconds;
-using cpputils::dynamic_pointer_move;
 using gitversion::VersionCompare;
 
 //TODO Delete a large file in parallel possible? Takes a long time right now...
@@ -72,8 +67,8 @@ using gitversion::VersionCompare;
 namespace cryfs_cli {
 
     Cli::Cli(RandomGenerator *keyGenerator, const SCryptSettings &scryptSettings, shared_ptr<Console> console):
-            _keyGenerator(keyGenerator), _scryptSettings(scryptSettings), _console(), _noninteractive(Environment::isNoninteractive()), _idleUnmounter(none), _device(none) {
-        
+            _keyGenerator(keyGenerator), _scryptSettings(scryptSettings), _console(), _noninteractive(Environment::isNoninteractive()), _device(none) {
+
         if (_noninteractive) {
             _console = make_shared<NoninteractiveConsole>(console);
         } else {
@@ -198,9 +193,48 @@ namespace cryfs_cli {
         basedirMetadata.save();
     }
 
+    namespace {
+        string formatV2RootOpenStatusDescription(formatv2::RootOpenStatus status) {
+            switch (status) {
+                case formatv2::RootOpenStatus::Selected:
+                    return "selected";
+                case formatv2::RootOpenStatus::NoAuthenticatedRoots:
+                    return "no authenticated roots";
+                case formatv2::RootOpenStatus::RollbackDetected:
+                    return "rollback detected";
+                case formatv2::RootOpenStatus::AcceptedRootMissing:
+                    return "accepted root missing";
+                case formatv2::RootOpenStatus::AmbiguousRootEpoch:
+                    return "ambiguous root epoch";
+                case formatv2::RootOpenStatus::RootContentUnavailable:
+                    return "root content unavailable";
+                case formatv2::RootOpenStatus::RootDirectoryUnavailable:
+                    return "root directory unavailable";
+                case formatv2::RootOpenStatus::RootTreeInvalid:
+                    return "root tree invalid";
+            }
+            ASSERT(false, "Unknown format-v2 root open status");
+        }
+
+        void requireSelectedFormatV2Root(
+            const formatv2::RootOpenWithValidatedTreeResult &result,
+            const string &failurePrefix,
+            ErrorCode errorCode) {
+            if (result.status == formatv2::RootOpenStatus::Selected
+                && result.rootDirectory != none) {
+                return;
+            }
+
+            throw CryfsException(
+                failurePrefix + ": " + formatV2RootOpenStatusDescription(result.status),
+                errorCode);
+        }
+    }
+
     CryConfigLoader::ConfigLoadResult Cli::_loadOrCreateConfig(const ProgramOptions &options, const LocalStateDir& localStateDir) {
         auto configFile = _determineConfigFile(options);
-        auto config = _loadOrCreateConfigFile(std::move(configFile), localStateDir, options.cipher(), options.blocksizeBytes(), options.allowFilesystemUpgrade(), options.missingBlockIsIntegrityViolation(), options.allowReplacedFilesystem());
+        const bool isNewFilesystem = !bf::exists(configFile);
+        auto config = _loadOrCreateConfigFile(std::move(configFile), localStateDir, options.cipher(), options.blocksizeBytes(), options.allowReplacedFilesystem());
         if (config.is_left()) {
             switch(config.left()) {
                 case CryConfigFile::LoadError::DecryptionFailed:
@@ -210,10 +244,57 @@ namespace cryfs_cli {
             }
         }
         _checkConfigIntegrity(options.baseDir(), localStateDir, *config.right().configFile, options.allowReplacedFilesystem());
+        if (isNewFilesystem) {
+            _createInitialFormatV2VolumeForNewFilesystem(options.baseDir(), localStateDir, *config.right().configFile);
+        } else {
+            _openExistingFormatV2VolumeForMount(options.baseDir(), localStateDir, *config.right().configFile);
+        }
         return std::move(config.right());
     }
 
-    either<CryConfigFile::LoadError, CryConfigLoader::ConfigLoadResult> Cli::_loadOrCreateConfigFile(bf::path configFilePath, LocalStateDir localStateDir, const optional<string> &cipher, const optional<uint32_t> &blocksizeBytes, bool allowFilesystemUpgrade, const optional<bool> &missingBlockIsIntegrityViolation, bool allowReplacedFilesystem) {
+    void Cli::_createInitialFormatV2VolumeForNewFilesystem(const bf::path& basedir, const LocalStateDir& localStateDir, const CryConfigFile& config) {
+        try {
+            const bf::path filesystemStateDir = localStateDir.forFilesystemId(config.config()->FilesystemId());
+            const auto opened = formatv2::createOrOpenInitialEmptyVolume(
+                formatv2::volumeLayout(basedir, filesystemStateDir),
+                config.config()->FilesystemId(),
+                config.config()->EncryptionKey(),
+                _keyGenerator,
+                formatv2::initialRootDirectoryMetadata());
+            requireSelectedFormatV2Root(
+                opened,
+                "Failed to initialize format-v2 root",
+                ErrorCode::UnspecifiedError);
+        } catch (const CryfsException &) {
+            throw;
+        } catch (const std::exception &e) {
+            throw CryfsException(
+                string("Failed to initialize format-v2 root: ") + e.what(),
+                ErrorCode::UnspecifiedError);
+        }
+    }
+
+    void Cli::_openExistingFormatV2VolumeForMount(const bf::path& basedir, const LocalStateDir& localStateDir, const CryConfigFile& config) {
+        try {
+            const bf::path filesystemStateDir = localStateDir.forFilesystemId(config.config()->FilesystemId());
+            const auto opened = formatv2::openVolumeRoot(
+                formatv2::volumeLayout(basedir, filesystemStateDir),
+                config.config()->FilesystemId(),
+                config.config()->EncryptionKey());
+            requireSelectedFormatV2Root(
+                opened,
+                "Failed to open format-v2 root",
+                ErrorCode::InvalidFilesystem);
+        } catch (const CryfsException &) {
+            throw;
+        } catch (const std::exception &e) {
+            throw CryfsException(
+                string("Failed to open format-v2 root: ") + e.what(),
+                ErrorCode::InvalidFilesystem);
+        }
+    }
+
+    either<CryConfigFile::LoadError, CryConfigLoader::ConfigLoadResult> Cli::_loadOrCreateConfigFile(bf::path configFilePath, LocalStateDir localStateDir, const optional<string> &cipher, const optional<uint32_t> &blocksizeBytes, bool allowReplacedFilesystem) {
         // TODO Instead of passing in _askPasswordXXX functions to KeyProvider, only pass in console and move logic to the key provider,
         //      for example by having a separate CryPasswordBasedKeyProvider / CryNoninteractivePasswordBasedKeyProvider.
         auto keyProvider = make_unique_ref<CryPasswordBasedKeyProvider>(
@@ -223,7 +304,7 @@ namespace cryfs_cli {
           make_unique_ref<SCrypt>(_scryptSettings)
         );
         return CryConfigLoader(_console, _keyGenerator, std::move(keyProvider), std::move(localStateDir),
-                               cipher, blocksizeBytes, missingBlockIsIntegrityViolation).loadOrCreate(std::move(configFilePath), allowFilesystemUpgrade, allowReplacedFilesystem);
+                               cipher, blocksizeBytes).loadOrCreate(std::move(configFilePath), allowReplacedFilesystem);
     }
 
     namespace {
@@ -256,41 +337,26 @@ namespace cryfs_cli {
     void Cli::_runFilesystem(const ProgramOptions &options, std::function<void()> onMounted) {
         try {
             const LocalStateDir localStateDir(Environment::localStateDir());
-            auto blockStore = make_unique_ref<OnDiskBlockStore2>(options.baseDir());
+            if (options.unmountAfterIdleMinutes() != none) {
+                throw CryfsException(
+                    "--unmount-idle is not supported by the format-v2 mount path yet.",
+                    ErrorCode::InvalidArguments);
+            }
             auto config = _loadOrCreateConfig(options, localStateDir);
             printConfig(config.oldConfig, *config.configFile->config());
             unique_ptr<fspp::fuse::Fuse> fuse = nullptr;
-            bool stoppedBecauseOfIntegrityViolation = false;
 
-            auto onIntegrityViolation = [&fuse, &stoppedBecauseOfIntegrityViolation] () {
-              if (fuse.get() != nullptr) {
-                LOG(ERR, "Integrity violation detected. Unmounting.");
-                stoppedBecauseOfIntegrityViolation = true;
-                fuse->stop();
-              } else {
-                // Usually on an integrity violation, the file system is unmounted.
-                // Here, the file system isn't initialized yet, i.e. we failed in the initial steps when
-                // setting up _device before running initFilesystem.
-                // We can't unmount a not-mounted file system, but we can make sure it doesn't get mounted.
-                throw CryfsException("Integrity violation detected. Unmounting.", ErrorCode::IntegrityViolation);
-              }
-            };
-            const bool missingBlockIsIntegrityViolation = config.configFile->config()->missingBlockIsIntegrityViolation();
-            _device = optional<unique_ref<CryDevice>>(make_unique_ref<CryDevice>(std::move(config.configFile), std::move(blockStore), std::move(localStateDir), config.myClientId, options.allowIntegrityViolations(), missingBlockIsIntegrityViolation, std::move(onIntegrityViolation)));
+            const bf::path filesystemStateDir = localStateDir.forFilesystemId(config.configFile->config()->FilesystemId());
+            _device = optional<unique_ref<fspp::Device>>(
+                make_unique_ref<formatv2::FormatV2Device>(
+                    formatv2::volumeLayout(options.baseDir(), filesystemStateDir),
+                    config.configFile->config()->FilesystemId(),
+                    config.configFile->config()->EncryptionKey(),
+                    _keyGenerator));
             _sanityCheckFilesystem(_device->get());
 
-            auto initFilesystem = [&] (fspp::fuse::Fuse *fs){
+            auto initFilesystem = [&] (fspp::fuse::Fuse *){
                 ASSERT(_device != none, "File system not ready to be initialized. Was it already initialized before?");
-
-                //TODO Test auto unmounting after idle timeout
-                const boost::optional<double> idle_minutes = options.unmountAfterIdleMinutes();
-                _idleUnmounter = _createIdleCallback(idle_minutes, [fs, idle_minutes] {
-                    LOG(INFO, "Unmounting because file system was idle for {} minutes", *idle_minutes);
-                    fs->stop();
-                });
-                if (_idleUnmounter != none) {
-                    (*_device)->onFsAction(std::bind(&CallAfterTimeout::resetTimer, _idleUnmounter->get()));
-                }
 
                 return make_shared<fspp::FilesystemImpl>(std::move(*_device));
             };
@@ -307,10 +373,6 @@ namespace cryfs_cli {
             } else {
                 fuse->runInBackground(options.mountDir(), options.fuseOptions());
             }
-
-            if (stoppedBecauseOfIntegrityViolation) {
-              throw CryfsException("Integrity violation detected. Unmounting.", ErrorCode::IntegrityViolation);
-            }
         } catch (const CryfsException &e) {
             throw; // CryfsException is only thrown if setup goes wrong. Throw it through so that we get the correct process exit code.
         } catch (const std::exception &e) {
@@ -320,25 +382,13 @@ namespace cryfs_cli {
         }
     }
 
-    void Cli::_sanityCheckFilesystem(CryDevice *device) {
+    void Cli::_sanityCheckFilesystem(fspp::Device *device) {
         //Try to list contents of base directory
-        auto _rootDir = device->Load("/"); // this might throw an exception if the root blob doesn't exist
-        if (_rootDir == none) {
-            throw CryfsException("Couldn't find root blob", ErrorCode::InvalidFilesystem);
-        }
-        auto rootDir = dynamic_pointer_move<CryDir>(*_rootDir);
+        auto rootDir = device->LoadDir("/"); // this might throw an exception if the root directory doesn't exist
         if (rootDir == none) {
-            throw CryfsException("Base directory blob doesn't contain a directory", ErrorCode::InvalidFilesystem);
+            throw CryfsException("Couldn't find root directory", ErrorCode::InvalidFilesystem);
         }
         (*rootDir)->children(); // Load children
-    }
-
-    optional<unique_ref<CallAfterTimeout>> Cli::_createIdleCallback(optional<double> minutes, function<void()> callback) {
-        if (minutes == none) {
-            return none;
-        }
-        const uint64_t millis = std::llround(60000 * (*minutes));
-        return make_unique_ref<CallAfterTimeout>(milliseconds(millis), callback, "idlecallback");
     }
 
     void Cli::_initLogfile(const ProgramOptions &options) {

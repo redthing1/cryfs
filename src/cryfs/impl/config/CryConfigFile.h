@@ -14,15 +14,10 @@ namespace cryfs {
     public:
         enum class Access : uint8_t {
             // Never write to the config file, just read it.
-            // Note that this is only sound if the file system itself
-            // is also loaded read-only, or at least with migrations disabled.
-            // Otherwise, the file system might get migrated but the config
-            // file will still say it's the old version.
             ReadOnly,
 
             // Load the config file and update it if necessary,
-            // e.g. write the "last opened with" entry into it
-            // and potentially upgrade the version number.
+            // e.g. write the "last opened with" entry into it.
             ReadWrite,
         };
 

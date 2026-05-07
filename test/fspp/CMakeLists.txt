@@ -5,6 +5,8 @@ set(SOURCES
     testutils/FuseThread.cpp
     testutils/InMemoryFile.cpp
     impl/FuseOpenFileListTest.cpp
+    impl/FilesystemImplUnsupportedOpenFlagsTest.cpp
+    impl/FilesystemImplSyncDirTest.cpp
     impl/IdListTest.cpp
     fuse/lstat/FuseLstatReturnUidTest.cpp
     fuse/lstat/testutils/FuseLstatTest.cpp
@@ -59,6 +61,7 @@ set(SOURCES
     fuse/fsync/testutils/FuseFsyncTest.cpp
     fuse/fsync/FuseFsyncFileDescriptorTest.cpp
     fuse/fsync/FuseFsyncErrorTest.cpp
+    fuse/fsyncdir/FuseFsyncDirTest.cpp
     fuse/openFile/testutils/FuseOpenTest.cpp
     fuse/openFile/FuseOpenFilenameTest.cpp
     fuse/openFile/FuseOpenFlagsTest.cpp

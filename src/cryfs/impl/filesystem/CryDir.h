@@ -20,6 +20,7 @@ public:
 
   //TODO Make Entry a public class instead of hidden in DirBlob (which is not publicly visible)
   std::vector<fspp::Dir::Entry> children() override;
+  void fsync() override;
   size_t numChildren();
 
   fspp::Dir::EntryType getType() const override;

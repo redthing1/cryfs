@@ -1,3 +1,4 @@
+#include <boost/filesystem.hpp>
 #include <fstream>
 #include <cpp-utils/random/Random.h>
 #include <unordered_set>
@@ -17,19 +18,18 @@ using cpputils::Deserializer;
 namespace blockstore {
 namespace integrity {
 
-const string KnownBlockVersions::OLD_HEADER = "cryfs.integritydata.knownblockversions;0";
 const string KnownBlockVersions::HEADER = "cryfs.integritydata.knownblockversions;1";
 constexpr uint32_t KnownBlockVersions::CLIENT_ID_FOR_DELETED_BLOCK;
 
 KnownBlockVersions::KnownBlockVersions(const bf::path &stateFilePath, uint32_t myClientId)
-        :_integrityViolationOnPreviousRun(false), _knownVersions(), _lastUpdateClientId(), _stateFilePath(stateFilePath), _myClientId(myClientId), _mutex(), _valid(true) {
+        :_integrityViolationOnPreviousRun(false), _knownVersions(), _lastUpdateClientId(), _stateFilePath(stateFilePath), _myClientId(myClientId), _mutex(), _dirty(false), _valid(true) {
     const unique_lock<mutex> lock(_mutex);
     ASSERT(_myClientId != CLIENT_ID_FOR_DELETED_BLOCK, "This is not a valid client id");
     _loadStateFile();
 }
 
 KnownBlockVersions::KnownBlockVersions(KnownBlockVersions &&rhs) // NOLINT (intentionally not noexcept)
-        : _integrityViolationOnPreviousRun(false), _knownVersions(), _lastUpdateClientId(), _stateFilePath(), _myClientId(0), _mutex(), _valid(true) {
+        : _integrityViolationOnPreviousRun(false), _knownVersions(), _lastUpdateClientId(), _stateFilePath(), _myClientId(0), _mutex(), _dirty(false), _valid(true) {
     const unique_lock<mutex> rhsLock(rhs._mutex);
     const unique_lock<mutex> lock(_mutex);
     // NOLINTBEGIN(cppcoreguidelines-prefer-member-initializer) -- we need to initialize those within the mutexes
@@ -38,23 +38,68 @@ KnownBlockVersions::KnownBlockVersions(KnownBlockVersions &&rhs) // NOLINT (inte
     _lastUpdateClientId = std::move(rhs._lastUpdateClientId);
     _stateFilePath = std::move(rhs._stateFilePath);
     _myClientId = rhs._myClientId;
+    _dirty = rhs._dirty;
     rhs._valid = false;
     // NOLINTEND(cppcoreguidelines-prefer-member-initializer)
 }
 
-KnownBlockVersions::~KnownBlockVersions() {
-    const unique_lock<mutex> lock(_mutex);
-    if (_valid) {
-        _saveStateFile();
+KnownBlockVersions::~KnownBlockVersions() = default;
+
+KnownBlockVersions::BlockStateRollback::BlockStateRollback(KnownBlockVersions *knownVersions, const BlockId &blockId)
+        : _knownVersions(knownVersions), _blockId(blockId), _myVersion(), _lastUpdateClientId(), _dirty(false), _committed(false) {
+    const unique_lock<mutex> lock(_knownVersions->_mutex);
+    ASSERT(_knownVersions->_valid, "Object not valid due to a std::move");
+    _dirty = _knownVersions->_dirty;
+
+    const auto version = _knownVersions->_knownVersions.find({_knownVersions->_myClientId, blockId});
+    if (version != _knownVersions->_knownVersions.end()) {
+        _myVersion = version->second;
+    }
+
+    const auto lastUpdateClientId = _knownVersions->_lastUpdateClientId.find(blockId);
+    if (lastUpdateClientId != _knownVersions->_lastUpdateClientId.end()) {
+        _lastUpdateClientId = lastUpdateClientId->second;
     }
 }
 
+KnownBlockVersions::BlockStateRollback::~BlockStateRollback() {
+    if (!_committed) {
+        _knownVersions->_restoreBlockState(_blockId, _myVersion, _lastUpdateClientId, _dirty);
+    }
+}
+
+void KnownBlockVersions::BlockStateRollback::commit() {
+    _committed = true;
+}
+
+KnownBlockVersions::BlockStateRollback KnownBlockVersions::rollbackOnFailure(const BlockId &blockId) {
+    return BlockStateRollback(this, blockId);
+}
+
 void KnownBlockVersions::setIntegrityViolationOnPreviousRun(bool value) {
+    const unique_lock<mutex> lock(_mutex);
+    ASSERT(_valid, "Object not valid due to a std::move");
+    if (_integrityViolationOnPreviousRun == value) {
+        return;
+    }
     _integrityViolationOnPreviousRun = value;
+    _dirty = true;
 }
 
 bool KnownBlockVersions::integrityViolationOnPreviousRun() const {
+    const unique_lock<mutex> lock(_mutex);
+    ASSERT(_valid, "Object not valid due to a std::move");
     return _integrityViolationOnPreviousRun;
+}
+
+void KnownBlockVersions::save() const {
+    const unique_lock<mutex> lock(_mutex);
+    ASSERT(_valid, "Object not valid due to a std::move");
+    if (!_dirty) {
+        return;
+    }
+    _saveStateFile();
+    _dirty = false;
 }
 
 bool KnownBlockVersions::checkAndUpdateVersion(uint32_t clientId, const BlockId &blockId, uint64_t version) {
@@ -64,21 +109,29 @@ bool KnownBlockVersions::checkAndUpdateVersion(uint32_t clientId, const BlockId 
     ASSERT(version > 0, "Version has to be >0"); // Otherwise we wouldn't handle notexisting entries correctly.
     ASSERT(_valid, "Object not valid due to a std::move");
 
-    uint64_t &found = _knownVersions[{clientId, blockId}]; // If the entry doesn't exist, this creates it with value 0.
-    if (found > version) {
+    const ClientIdAndBlockId versionKey{clientId, blockId};
+    const auto foundVersion = _knownVersions.find(versionKey);
+    const uint64_t currentVersion = foundVersion == _knownVersions.end() ? 0 : foundVersion->second;
+    if (currentVersion > version) {
         // This client already published a newer block version. Rollbacks are not allowed.
         return false;
     }
 
-    uint32_t &lastUpdateClientId = _lastUpdateClientId[blockId]; // If entry doesn't exist, this creates it with value 0. However, in this case, found == 0 (and version > 0), which means found != version.
-    if (found == version && lastUpdateClientId != clientId) {
+    const auto foundLastUpdateClientId = _lastUpdateClientId.find(blockId);
+    const uint32_t currentLastUpdateClientId = foundLastUpdateClientId == _lastUpdateClientId.end() ? CLIENT_ID_FOR_DELETED_BLOCK : foundLastUpdateClientId->second;
+    if (currentVersion == version && currentLastUpdateClientId != clientId) {
         // This is a roll back to the "newest" block of client [clientId], which was since then superseded by a version from client _lastUpdateClientId[blockId].
         // This is not allowed.
         return false;
     }
 
-    found = version;
-    lastUpdateClientId = clientId;
+    if (currentVersion == version && currentLastUpdateClientId == clientId) {
+        return true;
+    }
+
+    _knownVersions[versionKey] = version;
+    _lastUpdateClientId[blockId] = clientId;
+    _dirty = true;
     return true;
 }
 
@@ -92,28 +145,25 @@ uint64_t KnownBlockVersions::incrementVersion(const BlockId &blockId) {
     }
     found = newVersion;
     _lastUpdateClientId[blockId] = _myClientId;
+    _dirty = true;
     return found;
 }
 
 void KnownBlockVersions::_loadStateFile() {
-    optional<Data> file = Data::LoadFromFile(_stateFilePath);
-    if (file == none) {
+    if (!bf::exists(_stateFilePath)) {
         // File doesn't exist means we loaded empty state.
         return;
+    }
+    if (!bf::is_regular_file(_stateFilePath)) {
+        throw std::runtime_error("Invalid local state: Integrity file is not a regular file.");
+    }
+    optional<Data> file = Data::LoadFromFile(_stateFilePath);
+    if (file == none) {
+        throw std::runtime_error("Invalid local state: Could not read integrity file.");
     }
     Deserializer deserializer(&*file);
     const string loaded_header = deserializer.readString();
 
-#ifndef CRYFS_NO_COMPATIBILITY
-    if (OLD_HEADER == loaded_header) {
-        _knownVersions = _deserializeKnownVersions(&deserializer);
-        _lastUpdateClientId = _deserializeLastUpdateClientIds(&deserializer);
-
-        deserializer.finished();
-        _saveStateFile();
-        return;
-    }
-#endif
     if (HEADER != loaded_header) {
         throw std::runtime_error("Invalid local state: Invalid integrity file header.");
     }
@@ -137,6 +187,29 @@ void KnownBlockVersions::_saveStateFile() const {
     _serializeLastUpdateClientIds(&serializer, _lastUpdateClientId);
 
     serializer.finished().StoreToFile(_stateFilePath);
+}
+
+void KnownBlockVersions::_restoreBlockState(
+    const BlockId &blockId,
+    const optional<uint64_t> &myVersion,
+    const optional<uint32_t> &lastUpdateClientId,
+    bool dirty) {
+    const unique_lock<mutex> lock(_mutex);
+    ASSERT(_valid, "Object not valid due to a std::move");
+
+    const ClientIdAndBlockId versionKey{_myClientId, blockId};
+    if (myVersion == none) {
+        _knownVersions.erase(versionKey);
+    } else {
+        _knownVersions[versionKey] = *myVersion;
+    }
+
+    if (lastUpdateClientId == none) {
+        _lastUpdateClientId.erase(blockId);
+    } else {
+        _lastUpdateClientId[blockId] = *lastUpdateClientId;
+    }
+    _dirty = dirty;
 }
 
 std::unordered_map<ClientIdAndBlockId, uint64_t> KnownBlockVersions::_deserializeKnownVersions(Deserializer *deserializer) {
@@ -216,20 +289,31 @@ uint64_t KnownBlockVersions::getBlockVersion(uint32_t clientId, const BlockId &b
 }
 
 void KnownBlockVersions::markBlockAsDeleted(const BlockId &blockId) {
+    const unique_lock<mutex> lock(_mutex);
+    ASSERT(_valid, "Object not valid due to a std::move");
+    const auto found = _lastUpdateClientId.find(blockId);
+    if (found != _lastUpdateClientId.end() && found->second == CLIENT_ID_FOR_DELETED_BLOCK) {
+        return;
+    }
     _lastUpdateClientId[blockId] = CLIENT_ID_FOR_DELETED_BLOCK;
+    _dirty = true;
 }
 
 bool KnownBlockVersions::blockShouldExist(const BlockId &blockId) const {
+    const unique_lock<mutex> lock(_mutex);
+    ASSERT(_valid, "Object not valid due to a std::move");
     auto found = _lastUpdateClientId.find(blockId);
     if (found == _lastUpdateClientId.end()) {
         // We've never seen (i.e. loaded) this block. So we can't say it has to exist.
         return false;
     }
-    // We've seen the block before. If we didn't delete it, it should exist (only works for single-client scenario).
+    // We've seen the block before. If we didn't delete it, the hard-fork core treats its absence as an integrity violation.
     return found->second != CLIENT_ID_FOR_DELETED_BLOCK;
 }
 
 std::unordered_set<BlockId> KnownBlockVersions::existingBlocks() const {
+    const unique_lock<mutex> lock(_mutex);
+    ASSERT(_valid, "Object not valid due to a std::move");
     std::unordered_set<BlockId> result;
     for (const auto &entry : _lastUpdateClientId) {
         if (entry.second != CLIENT_ID_FOR_DELETED_BLOCK) {

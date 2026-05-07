@@ -27,6 +27,9 @@ public:
   void remove(cpputils::unique_ref<DataTreeRef> tree);
   void remove(const blockstore::BlockId &blockId);
 
+  void flush();
+  void sync();
+
   //TODO Test blocksizeBytes/numBlocks/estimateSpaceForNumBlocksLeft
   uint64_t virtualBlocksizeBytes() const;
   uint64_t numNodes() const;
@@ -49,6 +52,14 @@ inline uint64_t ParallelAccessDataTreeStore::numNodes() const {
 
 inline uint64_t ParallelAccessDataTreeStore::estimateSpaceForNumNodesLeft() const {
     return _dataTreeStore->estimateSpaceForNumNodesLeft();
+}
+
+inline void ParallelAccessDataTreeStore::flush() {
+    return _dataTreeStore->flush();
+}
+
+inline void ParallelAccessDataTreeStore::sync() {
+    return _dataTreeStore->sync();
 }
 
 }

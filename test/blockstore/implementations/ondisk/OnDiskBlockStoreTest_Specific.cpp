@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <fstream>
+#include <set>
 #include <string_view>
 
 using ::testing::Test;
@@ -13,6 +14,7 @@ using cpputils::TempDir;
 using cpputils::Data;
 using std::ifstream;
 using std::ofstream;
+using std::set;
 using blockstore::BlockId;
 
 using namespace blockstore::ondisk;
@@ -30,8 +32,24 @@ public:
     return blockStore.create(initData.copy());
   }
 
+  boost::filesystem::path getPrefixDir(const boost::filesystem::path &rootDir, const BlockId &blockId) {
+    return rootDir / blockId.ToString().substr(0, 3);
+  }
+
+  boost::filesystem::path getPrefixDir(const BlockId &blockId) {
+    return getPrefixDir(baseDir.path(), blockId);
+  }
+
+  boost::filesystem::path getBlockFilepath(const boost::filesystem::path &rootDir, const BlockId &blockId) {
+    return getPrefixDir(rootDir, blockId) / blockId.ToString().substr(3);
+  }
+
+  boost::filesystem::path getBlockFilepath(const BlockId &blockId) {
+    return getBlockFilepath(baseDir.path(), blockId);
+  }
+
   uint64_t getPhysicalBlockSize(const BlockId &blockId) {
-    ifstream stream((baseDir.path() / blockId.ToString().substr(0,3) / blockId.ToString().substr(3)).c_str());
+    ifstream stream(getBlockFilepath(blockId).c_str());
     stream.seekg(0, stream.end);
     return stream.tellg();
   }
@@ -43,6 +61,12 @@ public:
     auto filepath = dir / idStr.substr(3);
     ofstream file(filepath.string().c_str(), std::ios::binary | std::ios::trunc);
     file.write(static_cast<const char*>(data), static_cast<std::streamsize>(size));
+  }
+
+  void writeFile(const boost::filesystem::path &filepath) {
+    boost::filesystem::create_directories(filepath.parent_path());
+    ofstream file(filepath.string().c_str(), std::ios::binary | std::ios::trunc);
+    file << "content";
   }
 };
 
@@ -79,6 +103,103 @@ TEST_F(OnDiskBlockStoreTest, NumBlocksIsCorrectAfterAddingTwoBlocksWithSameKeyPr
   EXPECT_TRUE(blockStore.tryCreate(key1, cpputils::Data(0)));
   EXPECT_TRUE(blockStore.tryCreate(key2, cpputils::Data(0)));
   EXPECT_EQ(2u, blockStore.numBlocks());
+}
+
+TEST_F(OnDiskBlockStoreTest, NumBlocksIgnoresNonBlockEntries) {
+  const BlockId blockId = BlockId::FromString("AB0123456789ABCDEF0123456789AB01");
+  ASSERT_TRUE(blockStore.tryCreate(blockId, cpputils::Data(0)));
+  writeFile(getBlockFilepath(blockId).string() + ".tmp.123.0");
+  writeFile(baseDir.path() / "ABC" / "not-a-block");
+  boost::filesystem::create_directories(baseDir.path() / "ABC" / "0123456789ABCDEF0123456789A");
+  writeFile(baseDir.path() / "not-a-prefix" / "0123456789ABCDEF0123456789A");
+
+  EXPECT_EQ(1u, blockStore.numBlocks());
+}
+
+TEST_F(OnDiskBlockStoreTest, ForEachBlockIgnoresNonBlockEntries) {
+  const BlockId blockId = BlockId::FromString("AB0123456789ABCDEF0123456789AB01");
+  ASSERT_TRUE(blockStore.tryCreate(blockId, cpputils::Data(0)));
+  writeFile(getBlockFilepath(blockId).string() + ".tmp.123.0");
+  writeFile(baseDir.path() / "ABC" / "not-a-block");
+  boost::filesystem::create_directories(baseDir.path() / "ABC" / "0123456789ABCDEF0123456789A");
+  writeFile(baseDir.path() / "not-a-prefix" / "0123456789ABCDEF0123456789A");
+  set<BlockId> seenBlocks;
+
+  blockStore.forEachBlock([&seenBlocks] (const BlockId &seenBlockId) {
+    seenBlocks.insert(seenBlockId);
+  });
+
+  EXPECT_EQ(set<BlockId>{blockId}, seenBlocks);
+}
+
+TEST_F(OnDiskBlockStoreTest, TryCreateExistingBlockDoesNotOverwriteData) {
+  const BlockId blockId = BlockId::FromString("AB0123456789ABCDEF0123456789AB01");
+  const Data original(8);
+  const Data replacement(11);
+  ASSERT_TRUE(blockStore.tryCreate(blockId, original));
+
+  EXPECT_FALSE(blockStore.tryCreate(blockId, replacement));
+
+  EXPECT_EQ(original, blockStore.load(blockId).value());
+}
+
+TEST_F(OnDiskBlockStoreTest, RemoveDeletesBlockFileAndEmptyPrefixDirectory) {
+  const BlockId blockId = BlockId::FromString("AB0123456789ABCDEF0123456789AB01");
+  ASSERT_TRUE(blockStore.tryCreate(blockId, cpputils::Data(0)));
+  ASSERT_TRUE(boost::filesystem::exists(getBlockFilepath(blockId)));
+  ASSERT_TRUE(boost::filesystem::exists(getPrefixDir(blockId)));
+
+  EXPECT_TRUE(blockStore.remove(blockId));
+
+  EXPECT_FALSE(boost::filesystem::exists(getBlockFilepath(blockId)));
+  EXPECT_FALSE(boost::filesystem::exists(getPrefixDir(blockId)));
+}
+
+TEST_F(OnDiskBlockStoreTest, RemoveKeepsNonEmptyPrefixDirectory) {
+  const BlockId key1 = BlockId::FromString("4CE72ECDD20877A12ADBF4E3927C0A13");
+  const BlockId key2 = BlockId::FromString("4CE72ECDD20877A12ADBF4E3927C0A14");
+  ASSERT_TRUE(blockStore.tryCreate(key1, cpputils::Data(0)));
+  ASSERT_TRUE(blockStore.tryCreate(key2, cpputils::Data(1)));
+
+  EXPECT_TRUE(blockStore.remove(key1));
+
+  EXPECT_FALSE(boost::filesystem::exists(getBlockFilepath(key1)));
+  EXPECT_TRUE(boost::filesystem::exists(getPrefixDir(key1)));
+  EXPECT_TRUE(boost::filesystem::exists(getBlockFilepath(key2)));
+  EXPECT_TRUE(blockStore.load(key2).is_initialized());
+}
+
+TEST_F(OnDiskBlockStoreTest, RemoveMissingBlockReturnsFalse) {
+  const BlockId blockId = BlockId::FromString("AB0123456789ABCDEF0123456789AB01");
+
+  EXPECT_FALSE(blockStore.remove(blockId));
+}
+
+TEST_F(OnDiskBlockStoreTest, ConstructorRemovesStaleTemporaryBlockFiles) {
+  const TempDir startupDir;
+  const BlockId blockId = BlockId::FromString("AB0123456789ABCDEF0123456789AB01");
+  const auto temporaryPath = boost::filesystem::path(getBlockFilepath(startupDir.path(), blockId).string() + ".tmp.123.0");
+  writeFile(temporaryPath);
+  ASSERT_TRUE(boost::filesystem::is_regular_file(temporaryPath));
+
+  OnDiskBlockStore2 reopenedBlockStore(startupDir.path());
+
+  EXPECT_FALSE(boost::filesystem::exists(temporaryPath));
+  EXPECT_FALSE(boost::filesystem::exists(getPrefixDir(startupDir.path(), blockId)));
+}
+
+TEST_F(OnDiskBlockStoreTest, ConstructorKeepsBlockFilesAndUnrecognizedFiles) {
+  const TempDir startupDir;
+  const BlockId blockId = BlockId::FromString("AB0123456789ABCDEF0123456789AB01");
+  const auto blockPath = getBlockFilepath(startupDir.path(), blockId);
+  const auto unrecognizedPath = boost::filesystem::path(blockPath.string() + ".tmp.pid.0");
+  writeFile(blockPath);
+  writeFile(unrecognizedPath);
+
+  OnDiskBlockStore2 reopenedBlockStore(startupDir.path());
+
+  EXPECT_TRUE(boost::filesystem::exists(blockPath));
+  EXPECT_TRUE(boost::filesystem::exists(unrecognizedPath));
 }
 
 TEST_F(OnDiskBlockStoreTest, LoadingBlockWithEmptyFile_ThrowsError) {

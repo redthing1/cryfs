@@ -31,8 +31,9 @@ FuseTest::FuseTest(): fsimpl(make_shared<MockFilesystem>()), _context(boost::non
   ON_CALL(*fsimpl, write(_,_,_,_)).WillByDefault(defaultAction);
   ON_CALL(*fsimpl, fsync(_)).WillByDefault(defaultAction);
   ON_CALL(*fsimpl, fdatasync(_)).WillByDefault(defaultAction);
+  ON_CALL(*fsimpl, syncDir(_)).WillByDefault(defaultAction);
   ON_CALL(*fsimpl, access(_,_)).WillByDefault(defaultAction);
-  ON_CALL(*fsimpl, createAndOpenFile(_,_,_,_)).WillByDefault(defaultAction);
+  ON_CALL(*fsimpl, createAndOpenFile(_,_,_,_,_)).WillByDefault(defaultAction);
   ON_CALL(*fsimpl, mkdir(_,_,_,_)).WillByDefault(defaultAction);
   ON_CALL(*fsimpl, rmdir(_)).WillByDefault(defaultAction);
   ON_CALL(*fsimpl, unlink(_)).WillByDefault(defaultAction);

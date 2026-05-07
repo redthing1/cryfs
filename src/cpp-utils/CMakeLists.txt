@@ -50,8 +50,9 @@ set(SOURCES
         system/homedir.cpp
         system/memory_nonwindows.cpp
         system/memory_windows.cpp
-        system/time.cpp
-		system/diskspace.cpp
+	        system/time.cpp
+			system/AtomicFile.cpp
+			system/diskspace.cpp
 		system/filetime_nonwindows.cpp
 		system/filetime_windows.cpp
 		system/env.cpp

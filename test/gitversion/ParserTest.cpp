@@ -88,6 +88,30 @@ TEST(ParserTest, TestDirtyDevVersion) {
     EXPECT_EQ(20u,     info.commitsSinceTag);
 }
 
+TEST(ParserTest, TestUntaggedDirtyDevVersion) {
+    const VersionInfo info = Parser::parse("0+untagged.2962.g45c23c8.dirty");
+    EXPECT_EQ("0",   info.majorVersion);
+    EXPECT_EQ("0",   info.minorVersion);
+    EXPECT_EQ("0",   info.hotfixVersion);
+    EXPECT_TRUE(     info.isDevVersion);
+    EXPECT_FALSE(    info.isStableVersion);
+    EXPECT_EQ("45c23c8", info.gitCommitId);
+    EXPECT_EQ("",    info.versionTag);
+    EXPECT_EQ(2962u, info.commitsSinceTag);
+}
+
+TEST(ParserTest, TestUntaggedDevVersion) {
+    const VersionInfo info = Parser::parse("0+untagged.2962.g45c23c8");
+    EXPECT_EQ("0",   info.majorVersion);
+    EXPECT_EQ("0",   info.minorVersion);
+    EXPECT_EQ("0",   info.hotfixVersion);
+    EXPECT_TRUE(     info.isDevVersion);
+    EXPECT_FALSE(    info.isStableVersion);
+    EXPECT_EQ("45c23c8", info.gitCommitId);
+    EXPECT_EQ("",    info.versionTag);
+    EXPECT_EQ(2962u, info.commitsSinceTag);
+}
+
 TEST(ParserTest, TestReleaseVersion_StableTag) {
     const VersionInfo info = Parser::parse("0.9.2-stable");
     EXPECT_EQ("0",   info.majorVersion);

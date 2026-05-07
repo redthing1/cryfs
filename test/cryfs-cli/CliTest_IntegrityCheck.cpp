@@ -4,8 +4,8 @@
 #include <cpp-utils/crypto/kdf/Scrypt.h>
 #include <cpp-utils/data/DataFixture.h>
 #include <cpp-utils/tempfile/TempDir.h>
-#include <blockstore/implementations/caching/CachingBlockStore2.h>
-#include <cryfs/impl/filesystem/cachingfsblobstore/CachingFsBlobStore.h>
+
+#include <fstream>
 
 using std::vector;
 using std::string;
@@ -107,7 +107,6 @@ TEST_F(CliTest_IntegrityCheck, givenIncorrectFilesystemKey_thenFails) {
   );
 }
 
-// TODO Also enable this
 TEST_F(CliTest_IntegrityCheck, givenFilesystemWithRolledBackBasedir_whenMounting_thenFails) {
   const vector<string> args{basedir.string().c_str(), mountdir.string().c_str(), "--cipher", "aes-256-gcm", "-f"};
   //TODO Remove "-f" parameter, once EXPECT_RUN_SUCCESS/EXPECT_RUN_ERROR can handle that
@@ -130,16 +129,12 @@ TEST_F(CliTest_IntegrityCheck, givenFilesystemWithRolledBackBasedir_whenMounting
   bf::remove_all(basedir);
   recursive_copy(backup.path() / "basedir", basedir);
 
-  // error code is success because it unmounts normally
-  EXPECT_RUN_ERROR(args, "Integrity violation detected. Unmounting.", ErrorCode::IntegrityViolation, [&] {
-    EXPECT_FALSE(readingFileIsSuccessful(mountdir / "myfile"));
-  });
+  EXPECT_RUN_ERROR(args, "Error 19: Failed to open format-v2 root: rollback detected", ErrorCode::InvalidFilesystem);
 
-  // Test it doesn't mount anymore now because it's marked with an integrity violation
-  EXPECT_RUN_ERROR(args, "There was an integrity violation detected. Preventing any further access to the file system.", ErrorCode::IntegrityViolationOnPreviousRun);
+  EXPECT_RUN_ERROR(args, "Error 19: Failed to open format-v2 root: rollback detected", ErrorCode::InvalidFilesystem);
 }
 
-TEST_F(CliTest_IntegrityCheck, whenRollingBackBasedirWhileMounted_thenUnmounts) {
+TEST_F(CliTest_IntegrityCheck, whenRollingBackBasedirWhileMounted_thenReadsFailAndNextMountFails) {
   const vector<string> args{basedir.string().c_str(), mountdir.string().c_str(), "--cipher", "aes-256-gcm", "-f"};
   //TODO Remove "-f" parameter, once EXPECT_RUN_SUCCESS/EXPECT_RUN_ERROR can handle that
 
@@ -152,14 +147,10 @@ TEST_F(CliTest_IntegrityCheck, whenRollingBackBasedirWhileMounted_thenUnmounts) 
   const TempDir backup;
   recursive_copy(basedir, backup.path() / "basedir");
 
-  EXPECT_RUN_ERROR(args, "Integrity violation detected. Unmounting.", ErrorCode::IntegrityViolation, [&] {
+  EXPECT_RUN_SUCCESS(args, mountdir, [&] {
     // modify the file system contents
     writeFile(mountdir / "myfile", "hello world 2");
     ASSERT(readingFileIsSuccessful(mountdir / "myfile"), ""); // just to make sure reading usually works
-
-    // wait for cache timeout (i.e. flush file system to disk)
-    constexpr auto cache_timeout = blockstore::caching::CachingBlockStore2::MAX_LIFETIME_SEC + cryfs::cachingfsblobstore::CachingFsBlobStore::MAX_LIFETIME_SEC;
-    boost::this_thread::sleep_for(boost::chrono::seconds(static_cast<int>(std::ceil(cache_timeout * 3))));
 
     // roll back base directory
     bf::remove_all(basedir);
@@ -169,8 +160,7 @@ TEST_F(CliTest_IntegrityCheck, whenRollingBackBasedirWhileMounted_thenUnmounts) 
     EXPECT_FALSE(readingFileIsSuccessful(mountdir / "myfile"));
   });
 
-  // Test it doesn't mount anymore now because it's marked with an integrity violation
-  EXPECT_RUN_ERROR(args, "There was an integrity violation detected. Preventing any further access to the file system.", ErrorCode::IntegrityViolationOnPreviousRun);
+  EXPECT_RUN_ERROR(args, "Error 19: Failed to open format-v2 root: rollback detected", ErrorCode::InvalidFilesystem);
 }
 
 }

@@ -67,6 +67,14 @@ namespace blockstore {
                 return _baseBlockStore->forEachBlock(callback);
             }
 
+            void flush() override {
+                return _baseBlockStore->flush();
+            }
+
+            void sync() override {
+                return _baseBlockStore->sync();
+            }
+
             void remove(cpputils::unique_ref<Block> block) override {
                 _increaseNumRemovedBlocks(block->blockId());
                 auto mockBlock = cpputils::dynamic_pointer_move<MockBlock>(block);

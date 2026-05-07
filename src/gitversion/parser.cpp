@@ -78,9 +78,15 @@ namespace gitversion {
         if (!stream.good()) {
             throw std::logic_error("Invalid version information: Missing delimiter after commitsSinceTag (versionInfo: "+versionInfo+").");
         }
+        if (commitsSinceTag == "untagged") {
+            getline(stream, commitsSinceTag, '.');
+            if (!stream.good()) {
+                throw std::logic_error("Invalid version information: Missing delimiter after untagged commitsSinceTag (versionInfo: "+versionInfo+").");
+            }
+        }
         string gitCommitId;
         getline(stream, gitCommitId, '.');
-        if (gitCommitId[0] != 'g') {
+        if (gitCommitId.empty() || gitCommitId[0] != 'g') {
             throw std::logic_error("Invalid version information: Git commit id component doesn't start with 'g' (versionInfo: "+versionInfo+").");
         }
         return std::make_tuple(gitCommitId.substr(1), std::stoul(commitsSinceTag));

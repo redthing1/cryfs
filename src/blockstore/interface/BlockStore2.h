@@ -45,6 +45,13 @@ public:
   virtual uint64_t estimateNumFreeBytes() const = 0;
   virtual uint64_t blockSizeFromPhysicalBlockSize(uint64_t blockSize) const = 0; // TODO Test
   virtual void forEachBlock(std::function<void (const BlockId &)> callback) const = 0;
+
+  // Push dirty in-process state to the next lower layer. This does not by
+  // itself promise host-storage durability.
+  virtual void flush() = 0;
+
+  // Make all prior changes durable at this store's persistence boundary.
+  virtual void sync() = 0;
 };
 
 }

@@ -1,10 +1,8 @@
 #include "CryConfig.h"
 
-#include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <sstream>
-#include <gitversion/VersionCompare.h>
 #include <cpp-utils/random/Random.h>
 
 
@@ -29,11 +27,6 @@ CryConfig::CryConfig()
 , _lastOpenedWithVersion("")
 , _blocksizeBytes(0)
 , _filesystemId(FilesystemID::Null())
-, _exclusiveClientId(none)
-#ifndef CRYFS_NO_COMPATIBILITY
-, _hasVersionNumbers(true)
-, _hasParentPointers(true)
-#endif
 {
 }
 
@@ -52,12 +45,6 @@ CryConfig CryConfig::load(const Data &data) {
   cfg._createdWithVersion = pt.get<string>("cryfs.createdWithVersion", cfg._version); // In CryFS <= 0.9.2, we didn't have this field, but also didn't update cryfs.version, so we can use this field instead.
   cfg._lastOpenedWithVersion = pt.get<string>("cryfs.lastOpenedWithVersion", cfg._version); // In CryFS <= 0.9.8, we didn't have this field, but used the cryfs.version field for this purpose.
   cfg._blocksizeBytes = pt.get<uint64_t>("cryfs.blocksizeBytes", 32832); // CryFS <= 0.9.2 used a 32KB block size which was this physical block size.
-  cfg._exclusiveClientId = pt.get_optional<uint32_t>("cryfs.exclusiveClientId");
-#ifndef CRYFS_NO_COMPATIBILITY
-  cfg._hasVersionNumbers = pt.get<bool>("cryfs.migrations.hasVersionNumbers", false);
-  cfg._hasParentPointers = pt.get<bool>("cryfs.migrations.hasParentPointers", false);
-#endif
-
   optional<string> filesystemIdOpt = pt.get_optional<string>("cryfs.filesystemId");
   if (filesystemIdOpt == none) {
     cfg._filesystemId = Random::Csprng()->getFixedSize<FilesystemID::BINARY_LENGTH>();
@@ -79,14 +66,6 @@ Data CryConfig::save() const {
   pt.put<string>("cryfs.lastOpenedWithVersion", _lastOpenedWithVersion);
   pt.put<uint64_t>("cryfs.blocksizeBytes", _blocksizeBytes);
   pt.put<string>("cryfs.filesystemId", _filesystemId.ToString());
-  if (_exclusiveClientId != none) {
-    pt.put<uint32_t>("cryfs.exclusiveClientId", *_exclusiveClientId);
-  }
-#ifndef CRYFS_NO_COMPATIBILITY
-  pt.put<bool>("cryfs.migrations.hasVersionNumbers", _hasVersionNumbers);
-  pt.put<bool>("cryfs.migrations.hasParentPointers", _hasParentPointers);
-#endif
-
   stringstream stream;
   write_json(stream, pt);
   return Data::LoadFromStream(stream);
@@ -155,35 +134,5 @@ const CryConfig::FilesystemID &CryConfig::FilesystemId() const {
 void CryConfig::SetFilesystemId(FilesystemID value) {
   _filesystemId = value;
 }
-
-optional<uint32_t> CryConfig::ExclusiveClientId() const {
-  return _exclusiveClientId;
-}
-
-void CryConfig::SetExclusiveClientId(optional<uint32_t> value) {
-  _exclusiveClientId = value;
-}
-
-bool CryConfig::missingBlockIsIntegrityViolation() const {
-    return _exclusiveClientId != boost::none;
-}
-
-#ifndef CRYFS_NO_COMPATIBILITY
-bool CryConfig::HasVersionNumbers() const {
-  return _hasVersionNumbers;
-}
-
-void CryConfig::SetHasVersionNumbers(bool value) {
-  _hasVersionNumbers = value;
-}
-
-bool CryConfig::HasParentPointers() const {
-  return _hasParentPointers;
-}
-
-void CryConfig::SetHasParentPointers(bool value) {
-  _hasParentPointers = value;
-}
-#endif
 
 }

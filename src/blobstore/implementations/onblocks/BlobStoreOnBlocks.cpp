@@ -56,6 +56,14 @@ void BlobStoreOnBlocks::remove(const BlockId &blockId) {
     _dataTreeStore->remove(blockId);
 }
 
+void BlobStoreOnBlocks::flush() {
+    _dataTreeStore->flush();
+}
+
+void BlobStoreOnBlocks::sync() {
+    _dataTreeStore->sync();
+}
+
 uint64_t BlobStoreOnBlocks::virtualBlocksizeBytes() const {
     return _dataTreeStore->virtualBlocksizeBytes();
 }

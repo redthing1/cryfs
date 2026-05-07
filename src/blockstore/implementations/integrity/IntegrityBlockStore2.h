@@ -32,7 +32,7 @@ private:
 // It depends on being used on top of an encrypted block store that protects integrity of the block contents (i.e. uses an authenticated cipher).
 class IntegrityBlockStore2 final: public BlockStore2 {
 public:
-  IntegrityBlockStore2(cpputils::unique_ref<BlockStore2> baseBlockStore, const boost::filesystem::path &integrityFilePath, uint32_t myClientId, bool allowIntegrityViolations, bool missingBlockIsIntegrityViolation, std::function<void ()> onIntegrityViolation);
+  IntegrityBlockStore2(cpputils::unique_ref<BlockStore2> baseBlockStore, const boost::filesystem::path &integrityFilePath, uint32_t myClientId, std::function<void ()> onIntegrityViolation);
 
   bool tryCreate(const BlockId &blockId, const cpputils::Data &data) override;
   bool remove(const BlockId &blockId) override;
@@ -42,12 +42,11 @@ public:
   uint64_t estimateNumFreeBytes() const override;
   uint64_t blockSizeFromPhysicalBlockSize(uint64_t blockSize) const override;
   void forEachBlock(std::function<void (const BlockId &)> callback) const override;
+  void flush() override;
+  void sync() override;
 
 private:
-  // This format version is prepended to blocks to allow future versions to have compatibility.
-#ifndef CRYFS_NO_COMPATIBILITY
-  static constexpr uint16_t FORMAT_VERSION_HEADER_OLD = 0;
-#endif
+  // This format version is prepended to blocks to fail closed on unsupported formats.
   static constexpr uint16_t FORMAT_VERSION_HEADER = 1;
 
 public:
@@ -56,11 +55,6 @@ public:
   static constexpr unsigned int CLIENTID_HEADER_OFFSET = ID_HEADER_OFFSET + BlockId::BINARY_LENGTH;
   static constexpr unsigned int VERSION_HEADER_OFFSET = CLIENTID_HEADER_OFFSET + sizeof(uint32_t);
   static constexpr unsigned int HEADER_LENGTH = VERSION_HEADER_OFFSET + sizeof(VERSION_ZERO);
-
-#ifndef CRYFS_NO_COMPATIBILITY
-  static void migrateFromBlockstoreWithoutVersionNumbers(BlockStore2 *baseBlockStore, const boost::filesystem::path &integrityFilePath, uint32_t myClientId);
-  static void migrateBlockFromBlockstoreWithoutVersionNumbers(BlockStore2* baseBlockStore, const blockstore::BlockId &blockId, KnownBlockVersions *knownBlockVersions);
-#endif
 
 private:
 
@@ -73,16 +67,11 @@ private:
   static uint32_t _readClientId(const cpputils::Data &data);
   static BlockId _readBlockId(const cpputils::Data &data);
   static uint64_t _readVersion(const cpputils::Data &data);
-#ifndef CRYFS_NO_COMPATIBILITY
-  static cpputils::Data _migrateBlock(const BlockId &blockId, const cpputils::Data &data);
-#endif
   static cpputils::Data _removeHeader(const cpputils::Data &data);
   void integrityViolationDetected(const std::string &reason) const;
 
   cpputils::unique_ref<BlockStore2> _baseBlockStore;
   mutable KnownBlockVersions _knownBlockVersions;
-  bool _allowIntegrityViolations;
-  bool _missingBlockIsIntegrityViolation;
   std::function<void ()> _onIntegrityViolation;
 
   DISALLOW_COPY_AND_ASSIGN(IntegrityBlockStore2);

@@ -33,6 +33,13 @@ public:
 
   virtual void forEachBlock(std::function<void (const BlockId &)> callback) const = 0;
 
+  // Push dirty in-process state to the next lower layer. Open blocks should be
+  // flushed before callers rely on this.
+  virtual void flush() = 0;
+
+  // Make all prior changes durable at this store's persistence boundary.
+  virtual void sync() = 0;
+
   virtual void remove(cpputils::unique_ref<Block> block) {
     const BlockId blockId = block->blockId();
     cpputils::destruct(std::move(block));

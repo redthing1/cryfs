@@ -1,9 +1,9 @@
 #include "Data.h"
+#include "../system/AtomicFile.h"
 #include <stdexcept>
 #include <vendor_cryptopp/hex.h>
 
 using std::istream;
-using std::ofstream;
 using std::ifstream;
 using std::ios;
 using boost::optional;
@@ -11,6 +11,10 @@ using boost::optional;
 namespace bf = boost::filesystem;
 
 namespace cpputils {
+
+void Data::StoreToFile(const bf::path &filepath) const {
+  storeFileAtomically(filepath, _data, _size);
+}
 
 optional<Data> Data::LoadFromFile(const bf::path &filepath) {
   ifstream file(filepath.string().c_str(), ios::binary);

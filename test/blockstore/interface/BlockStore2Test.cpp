@@ -33,6 +33,8 @@ public:
     MOCK_METHOD(uint64_t, estimateNumFreeBytes, (), (const, override));
     MOCK_METHOD(uint64_t, blockSizeFromPhysicalBlockSize, (uint64_t), (const, override));
     MOCK_METHOD(void, forEachBlock, (std::function<void (const blockstore::BlockId &)>), (const, override));
+    MOCK_METHOD(void, flush, (), (override));
+    MOCK_METHOD(void, sync, (), (override));
 };
 
 class BlockStore2Test: public Test {

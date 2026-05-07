@@ -42,7 +42,7 @@ namespace cryfs {
         if (plaintext == none) {
             return none;
         }
-        return Decrypted{std::move(*plaintext), innerConfig->cipherName, outerConfig->wasInDeprecatedConfigFormat};
+        return Decrypted{std::move(*plaintext), innerConfig->cipherName};
     }
 
     unique_ref<OuterEncryptor> CryConfigEncryptor::_outerEncryptor() const {

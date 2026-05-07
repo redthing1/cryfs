@@ -20,7 +20,6 @@ namespace cryfs {
         struct Decrypted {
             cpputils::Data data;
             std::string cipherName;
-            bool wasInDeprecatedConfigFormat;
         };
 
         CryConfigEncryptor(cpputils::EncryptionKey derivedKey, cpputils::Data _kdfParameters);

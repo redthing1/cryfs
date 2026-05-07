@@ -70,7 +70,6 @@ ProgramOptions Parser::parse(const vector<string> &supportedCiphers) const {
     }
     const bool foreground = true;
 #endif
-    const bool allowFilesystemUpgrade = vm.count("allow-filesystem-upgrade");
     const bool allowReplacedFilesystem = vm.count("allow-replaced-filesystem");
     const bool createMissingBasedir = vm.count("create-missing-basedir");
     const bool createMissingMountpoint = vm.count("create-missing-mountpoint");
@@ -92,11 +91,6 @@ ProgramOptions Parser::parse(const vector<string> &supportedCiphers) const {
     if (vm.count("blocksize")) {
         blocksizeBytes = vm["blocksize"].as<uint32_t>();
     }
-    const bool allowIntegrityViolations = vm.count("allow-integrity-violations");
-    optional<bool> missingBlockIsIntegrityViolation = none;
-    if (vm.count("missing-block-is-integrity-violation")) {
-        missingBlockIsIntegrityViolation = vm["missing-block-is-integrity-violation"].as<bool>();
-    }
 
     if (vm.count("fuse-option")) {
         auto options = vm["fuse-option"].as<vector<string>>();
@@ -106,7 +100,7 @@ ProgramOptions Parser::parse(const vector<string> &supportedCiphers) const {
         }
     }
 
-    return ProgramOptions(std::move(baseDir), std::move(mountDir), std::move(configfile), foreground, allowFilesystemUpgrade, allowReplacedFilesystem, createMissingBasedir, createMissingMountpoint, std::move(unmountAfterIdleMinutes), std::move(logfile), std::move(cipher), blocksizeBytes, allowIntegrityViolations, std::move(missingBlockIsIntegrityViolation), std::move(fuseOptions));
+    return ProgramOptions(std::move(baseDir), std::move(mountDir), std::move(configfile), foreground, allowReplacedFilesystem, createMissingBasedir, createMissingMountpoint, std::move(unmountAfterIdleMinutes), std::move(logfile), std::move(cipher), blocksizeBytes, std::move(fuseOptions));
 }
 
 void Parser::_checkValidCipher(const string &cipher, const vector<string> &supportedCiphers) {
@@ -177,9 +171,6 @@ void Parser::_addAllowedOptions(po::options_description *desc) {
             ("fuse-option,o", po::value<vector<string>>(), "Add a fuse mount option. Example: atime or noatime.")
             ("cipher", po::value<string>(), cipher_description.c_str())
             ("blocksize", po::value<uint32_t>(), blocksize_description.c_str())
-            ("missing-block-is-integrity-violation", po::value<bool>(), "Whether to treat a missing block as an integrity violation. This makes sure you notice if an attacker deleted some of your files, but only works in single-client mode. You will not be able to use the file system on other devices.")
-            ("allow-integrity-violations", "Disable integrity checks. Integrity checks ensure that your file system was not manipulated or rolled back to an earlier version. Disabling them is needed if you want to load an old snapshot of your file system.")
-            ("allow-filesystem-upgrade", "Allow upgrading the file system if it was created with an old CryFS version. After the upgrade, older CryFS versions might not be able to use the file system anymore.")
             ("allow-replaced-filesystem", "By default, CryFS remembers file systems it has seen in this base directory and checks that it didn't get replaced by an attacker with an entirely different file system since the last time it was loaded. However, if you do want to replace the file system with an entirely new one, you can pass in this option to disable the check.")
             ("create-missing-basedir", "Creates the base directory even if there is no directory currently there, skipping the normal confirmation message to create it later.")
             ("create-missing-mountpoint", "Creates the mountpoint even if there is no directory currently there, skipping the normal confirmation message to create it later.")

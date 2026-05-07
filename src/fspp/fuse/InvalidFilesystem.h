@@ -12,7 +12,7 @@ namespace fspp {
                 throw std::logic_error("Filesystem not initialized yet");
             }
 
-            int createAndOpenFile(const boost::filesystem::path &, ::mode_t , ::uid_t , ::gid_t ) override {
+            int createAndOpenFile(const boost::filesystem::path &, ::mode_t , ::uid_t , ::gid_t , int ) override {
                 throw std::logic_error("Filesystem not initialized yet");
             }
 
@@ -65,6 +65,10 @@ namespace fspp {
             }
 
             void fdatasync(int ) override {
+                throw std::logic_error("Filesystem not initialized yet");
+            }
+
+            void syncDir(const boost::filesystem::path &) override {
                 throw std::logic_error("Filesystem not initialized yet");
             }
 

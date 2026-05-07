@@ -23,7 +23,7 @@ public:
   virtual void setContext(Context&& context) = 0;
 
   //TODO Test uid/gid parameters of createAndOpenFile
-  virtual int createAndOpenFile(const boost::filesystem::path &path, ::mode_t mode, ::uid_t uid, ::gid_t gid) = 0;
+  virtual int createAndOpenFile(const boost::filesystem::path &path, ::mode_t mode, ::uid_t uid, ::gid_t gid, int flags) = 0;
   virtual int openFile(const boost::filesystem::path &path, int flags) = 0;
   virtual void flush(int descriptor) = 0;
   virtual void closeFile(int descriptor) = 0;
@@ -39,6 +39,7 @@ public:
   virtual void write(int descriptor, const void *buf, fspp::num_bytes_t count, fspp::num_bytes_t offset) = 0;
   virtual void fsync(int descriptor) = 0;
   virtual void fdatasync(int descriptor) = 0;
+  virtual void syncDir(const boost::filesystem::path &path) = 0;
   virtual void access(const boost::filesystem::path &path, int mask) = 0;
   //TODO Test uid/gid parameters of mkdir
   virtual void mkdir(const boost::filesystem::path &path, ::mode_t mode, ::uid_t uid, ::gid_t gid) = 0;

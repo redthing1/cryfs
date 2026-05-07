@@ -20,15 +20,13 @@ namespace cryfs {
             uint32_t myClientId;
         };
 
-        ConfigCreateResult create(const boost::optional<std::string> &cipherFromCommandLine, const boost::optional<uint32_t> &blocksizeBytesFromCommandLine, const boost::optional<bool> &missingBlockIsIntegrityViolationFromCommandLine, bool allowReplacedFilesystem);
+        ConfigCreateResult create(const boost::optional<std::string> &cipherFromCommandLine, const boost::optional<uint32_t> &blocksizeBytesFromCommandLine, bool allowReplacedFilesystem);
     private:
         std::string _generateCipher(const boost::optional<std::string> &cipherFromCommandLine);
         cpputils::EncryptionKey _generateEncKey(const std::string &cipher);
         std::string _generateRootBlobId();
         uint32_t _generateBlocksizeBytes(const boost::optional<uint32_t> &blocksizeBytesFromCommandLine);
         CryConfig::FilesystemID _generateFilesystemID();
-        boost::optional<uint32_t> _generateExclusiveClientId(const boost::optional<bool> &missingBlockIsIntegrityViolationFromCommandLine, uint32_t myClientId);
-        bool _generateMissingBlockIsIntegrityViolation(const boost::optional<bool> &missingBlockIsIntegrityViolationFromCommandLine);
 
         std::shared_ptr<cpputils::Console> _console;
         CryConfigConsole _configConsole;

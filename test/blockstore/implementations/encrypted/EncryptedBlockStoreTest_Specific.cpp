@@ -5,6 +5,7 @@
 #include "blockstore/utils/BlockStoreUtils.h"
 #include "../../testutils/gtest_printers.h"
 #include <cpp-utils/data/DataFixture.h>
+#include <cpp-utils/data/SerializationHelper.h>
 
 #include <cstddef>
 
@@ -58,6 +59,12 @@ public:
     return baseBlockStore->create(source);
   }
 
+  void SetUnsupportedBaseBlockFormat(const blockstore::BlockId &blockId) {
+    auto block = baseBlockStore->load(blockId).value();
+    cpputils::serialize<uint16_t>(block.data(), 0);
+    baseBlockStore->store(blockId, block);
+  }
+
 private:
   DISALLOW_COPY_AND_ASSIGN(EncryptedBlockStoreTest);
 };
@@ -104,6 +111,12 @@ TEST_F(EncryptedBlockStoreTest, LoadingModifiedBlockFails_WriteSeparately) {
   ModifyBaseBlock(blockId);
   auto loaded = blockStore->load(blockId);
   EXPECT_EQ(boost::none, loaded);
+}
+
+TEST_F(EncryptedBlockStoreTest, LoadingUnsupportedFormatFailsClosed) {
+  auto blockId = CreateBlockDirectlyWithFixtureAndReturnKey();
+  SetUnsupportedBaseBlockFormat(blockId);
+  EXPECT_THROW(blockStore->load(blockId), std::runtime_error);
 }
 
 TEST_F(EncryptedBlockStoreTest, PhysicalBlockSize_zerophysical) {

@@ -1,11 +1,19 @@
 #include "cpp-utils/data/DataFixture.h"
 #include "cpp-utils/data/Data.h"
+#include "cpp-utils/data/Deserializer.h"
 #include "cpp-utils/data/SerializationHelper.h"
 #include <gmock/gmock.h>
+#include "cpp-utils/tempfile/TempDir.h"
 #include "cpp-utils/tempfile/TempFile.h"
 
 #include <cstddef>
 #include <fstream>
+#include <iterator>
+#include <stdexcept>
+
+#if !defined(_WIN32)
+#include <sys/stat.h>
+#endif
 
 using ::testing::Test;
 using ::testing::WithParamInterface;
@@ -13,6 +21,7 @@ using ::testing::Values;
 using ::testing::Return;
 
 using cpputils::TempFile;
+using cpputils::TempDir;
 
 using std::ifstream;
 using std::ofstream;
@@ -21,6 +30,25 @@ using std::string;
 namespace bf = boost::filesystem;
 
 using namespace cpputils;
+
+namespace {
+
+#if !defined(_WIN32)
+class ScopedUmask final {
+public:
+  explicit ScopedUmask(mode_t mask): _previous(::umask(mask)) {
+  }
+
+  ~ScopedUmask() {
+    ::umask(_previous);
+  }
+
+private:
+  mode_t _previous;
+};
+#endif
+
+}
 
 class DataTest: public Test {
 public:
@@ -112,6 +140,43 @@ TEST_P(DataTestWithSizeParam, StoreAndLoad) {
   EXPECT_EQ(randomData, loaded_data);
 }
 
+TEST_F(DataTest, StoreToFileDoesNotLeaveTemporaryFiles) {
+  const TempDir dir;
+  const bf::path filepath = dir.path() / "data";
+  const Data data = DataFixture::generate(1024);
+
+  data.StoreToFile(filepath);
+
+  EXPECT_TRUE(bf::exists(filepath));
+  EXPECT_EQ(1, std::distance(bf::directory_iterator(dir.path()), bf::directory_iterator()));
+}
+
+TEST_F(DataTest, StoreToFilePreservesExistingPermissions) {
+  const TempFile file;
+  bf::permissions(file.path(), bf::owner_read | bf::owner_write);
+  const Data data = DataFixture::generate(1024);
+
+  data.StoreToFile(file.path());
+
+  const auto permissions = bf::status(file.path()).permissions();
+  EXPECT_EQ(bf::owner_read | bf::owner_write, permissions & bf::owner_all);
+}
+
+#if !defined(_WIN32)
+TEST_F(DataTest, StoreToFilePreservesExistingPermissionsDespiteUmask) {
+  const TempFile file;
+  const auto expectedPermissions = bf::owner_read | bf::owner_write | bf::group_read | bf::others_read;
+  bf::permissions(file.path(), expectedPermissions);
+  const ScopedUmask umask(0077);
+  const Data data = DataFixture::generate(1024);
+
+  data.StoreToFile(file.path());
+
+  const auto permissions = bf::status(file.path()).permissions();
+  EXPECT_EQ(expectedPermissions, permissions & (bf::owner_all | bf::group_all | bf::others_all));
+}
+#endif
+
 TEST_P(DataTestWithSizeParam, Copy) {
   const Data copy = randomData.copy();
   EXPECT_EQ(randomData, copy);
@@ -137,6 +202,14 @@ TEST_F(DataTest, FillModifiedDataWithZeroes) {
 
   data.FillWithZeroes();
   EXPECT_TRUE(DataIsZeroes(data));
+}
+
+TEST_F(DataTest, DeserializerFixedSizeDataRejectsTruncatedInput) {
+  Data data(3);
+  data.FillWithZeroes();
+  Deserializer deserializer(&data);
+
+  EXPECT_THROW(deserializer.readFixedSizeData<4>(), std::runtime_error);
 }
 
 TEST_F(DataTest, MoveConstructor) {

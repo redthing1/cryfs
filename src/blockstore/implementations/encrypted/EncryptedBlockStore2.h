@@ -27,26 +27,21 @@ public:
   uint64_t estimateNumFreeBytes() const override;
   uint64_t blockSizeFromPhysicalBlockSize(uint64_t blockSize) const override;
   void forEachBlock(std::function<void (const BlockId &)> callback) const override;
+  void flush() override;
+  void sync() override;
 
   //This function should only be used by test cases
   void _setKey(const typename Cipher::EncryptionKey &encKey);
 
 private:
 
-  // This header is prepended to blocks to allow future versions to have compatibility.
-#ifndef CRYFS_NO_COMPATIBILITY
-  static constexpr uint16_t FORMAT_VERSION_HEADER_OLD = 0;
-#endif
+  // This header is prepended to blocks to fail closed on unsupported formats.
   static constexpr uint16_t FORMAT_VERSION_HEADER = 1;
 
   cpputils::Data _encrypt(const cpputils::Data &data) const;
-  boost::optional<cpputils::Data> _tryDecrypt(const BlockId &blockId, const cpputils::Data &data) const;
+  boost::optional<cpputils::Data> _tryDecrypt(const cpputils::Data &data) const;
 
   static cpputils::Data _prependFormatHeaderToData(const cpputils::Data &data);
-#ifndef CRYFS_NO_COMPATIBILITY
-  static bool _blockIdHeaderIsCorrect(const BlockId &blockId, const cpputils::Data &data);
-  static cpputils::Data _migrateBlock(const cpputils::Data &data);
-#endif
   static void _checkFormatHeader(const cpputils::Data &data);
   static uint16_t _readFormatHeader(const cpputils::Data &data);
 
@@ -55,11 +50,6 @@ private:
 
   DISALLOW_COPY_AND_ASSIGN(EncryptedBlockStore2);
 };
-
-#ifndef CRYFS_NO_COMPATIBILITY
-template<class Cipher>
-constexpr uint16_t EncryptedBlockStore2<Cipher>::FORMAT_VERSION_HEADER_OLD;
-#endif
 
 template<class Cipher>
 constexpr uint16_t EncryptedBlockStore2<Cipher>::FORMAT_VERSION_HEADER;
@@ -87,7 +77,7 @@ inline boost::optional<cpputils::Data> EncryptedBlockStore2<Cipher>::load(const 
   if (boost::none == loaded) {
     return boost::optional<cpputils::Data>(boost::none);
   }
-  return _tryDecrypt(blockId, *loaded);
+  return _tryDecrypt(*loaded);
 }
 
 template<class Cipher>
@@ -121,13 +111,23 @@ inline void EncryptedBlockStore2<Cipher>::forEachBlock(std::function<void (const
 }
 
 template<class Cipher>
+inline void EncryptedBlockStore2<Cipher>::flush() {
+  return _baseBlockStore->flush();
+}
+
+template<class Cipher>
+inline void EncryptedBlockStore2<Cipher>::sync() {
+  return _baseBlockStore->sync();
+}
+
+template<class Cipher>
 inline cpputils::Data EncryptedBlockStore2<Cipher>::_encrypt(const cpputils::Data &data) const {
   const cpputils::Data encrypted = Cipher::encrypt(static_cast<const CryptoPP::byte*>(data.data()), data.size(), _encKey);
   return _prependFormatHeaderToData(encrypted);
 }
 
 template<class Cipher>
-inline boost::optional<cpputils::Data> EncryptedBlockStore2<Cipher>::_tryDecrypt(const BlockId &blockId, const cpputils::Data &data) const {
+inline boost::optional<cpputils::Data> EncryptedBlockStore2<Cipher>::_tryDecrypt(const cpputils::Data &data) const {
   _checkFormatHeader(data);
   boost::optional<cpputils::Data> decrypted = Cipher::decrypt(static_cast<const CryptoPP::byte*>(data.dataOffset(sizeof(FORMAT_VERSION_HEADER))), data.size() - sizeof(FORMAT_VERSION_HEADER), _encKey);
   if (decrypted == boost::none) {
@@ -135,31 +135,8 @@ inline boost::optional<cpputils::Data> EncryptedBlockStore2<Cipher>::_tryDecrypt
     return boost::none;
   }
 
-#ifndef CRYFS_NO_COMPATIBILITY
-  if (FORMAT_VERSION_HEADER_OLD == _readFormatHeader(data)) {
-    if (!_blockIdHeaderIsCorrect(blockId, *decrypted)) {
-      return boost::none;
-    }
-    *decrypted = _migrateBlock(*decrypted);
-    // no need to write migrated back to block store because
-    // this migration happens in line with a migration in IntegrityBlockStore2
-    // which then writes it back
-  }
-#endif
   return decrypted;
 }
-
-#ifndef CRYFS_NO_COMPATIBILITY
-template<class Cipher>
-inline cpputils::Data EncryptedBlockStore2<Cipher>::_migrateBlock(const cpputils::Data &data) {
-  return data.copyAndRemovePrefix(BlockId::BINARY_LENGTH);
-}
-
-template<class Cipher>
-inline bool EncryptedBlockStore2<Cipher>::_blockIdHeaderIsCorrect(const BlockId &blockId, const cpputils::Data &data) {
-  return blockId == BlockId::FromBinary(data.data());
-}
-#endif
 
 template<class Cipher>
 inline cpputils::Data EncryptedBlockStore2<Cipher>::_prependFormatHeaderToData(const cpputils::Data &data) {
@@ -172,11 +149,7 @@ inline cpputils::Data EncryptedBlockStore2<Cipher>::_prependFormatHeaderToData(c
 template<class Cipher>
 inline void EncryptedBlockStore2<Cipher>::_checkFormatHeader(const cpputils::Data &data) {
   const uint16_t formatVersionHeader = _readFormatHeader(data);
-#ifndef CRYFS_NO_COMPATIBILITY
-  const bool formatVersionHeaderValid = formatVersionHeader == FORMAT_VERSION_HEADER || formatVersionHeader == FORMAT_VERSION_HEADER_OLD;
-#else
   const bool formatVersionHeaderValid = formatVersionHeader == FORMAT_VERSION_HEADER;
-#endif
   if (!formatVersionHeaderValid) {
     throw std::runtime_error("The encrypted block has the wrong format. Was it created with a newer version of CryFS?");
   }

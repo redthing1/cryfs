@@ -34,6 +34,8 @@ public:
   //TODO Allow alternative implementation returning only children names without more information
   //virtual std::vector<std::string> children() const = 0;
   virtual std::vector<Entry> children() = 0;
+
+  virtual void fsync() = 0;
 };
 
 }

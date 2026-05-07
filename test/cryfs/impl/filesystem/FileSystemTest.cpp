@@ -39,9 +39,9 @@ public:
     auto blockStore = cpputils::make_unique_ref<InMemoryBlockStore2>();
     auto _console = make_shared<NoninteractiveConsole>(mockConsole());
     auto keyProvider = make_unique_ref<CryPresetPasswordBasedKeyProvider>("mypassword", make_unique_ref<SCrypt>(SCrypt::TestSettings));
-    auto config = CryConfigLoader(_console, Random::Csprng(), std::move(keyProvider), localStateDir, none, none, none)
-            .loadOrCreate(configFile.path(), false, false).right();
-    return make_unique_ref<CryDevice>(std::move(config.configFile), std::move(blockStore), localStateDir, config.myClientId, false, false, failOnIntegrityViolation());
+    auto config = CryConfigLoader(_console, Random::Csprng(), std::move(keyProvider), localStateDir, none, none)
+            .loadOrCreate(configFile.path(), false).right();
+    return make_unique_ref<CryDevice>(std::move(config.configFile), std::move(blockStore), localStateDir, config.myClientId, failOnIntegrityViolation());
   }
 
   cpputils::TempDir tempLocalStateDir;

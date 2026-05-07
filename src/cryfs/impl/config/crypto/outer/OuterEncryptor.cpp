@@ -17,7 +17,7 @@ namespace cryfs {
     OuterConfig OuterEncryptor::encrypt(const Data &plaintext) const {
         auto padded = RandomPadding::add(plaintext, CONFIG_SIZE);
         auto ciphertext = Cipher::encrypt(static_cast<const uint8_t*>(padded.data()), padded.size(), _key);
-        return OuterConfig{_kdfParameters.copy(), std::move(ciphertext), false};
+        return OuterConfig{_kdfParameters.copy(), std::move(ciphertext)};
     }
 
     optional<Data> OuterEncryptor::decrypt(const OuterConfig &outerConfig) const {

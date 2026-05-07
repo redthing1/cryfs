@@ -7,6 +7,8 @@
 
 namespace cpputils {
 
+// Temporary/probe helper. Do not use for durable filesystem state; use the
+// atomic-file helpers for persistence boundaries.
 class TempDir final {
 public:
   TempDir();

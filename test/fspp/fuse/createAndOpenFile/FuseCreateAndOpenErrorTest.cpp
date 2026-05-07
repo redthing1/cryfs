@@ -16,7 +16,7 @@ INSTANTIATE_TEST_SUITE_P(FuseCreateAndOpenErrorTest, FuseCreateAndOpenErrorTest,
 
 TEST_F(FuseCreateAndOpenErrorTest, ReturnNoError) {
   ReturnDoesntExistOnLstat(FILENAME);
-  EXPECT_CALL(*fsimpl, createAndOpenFile(Eq(FILENAME), testing::_, testing::_, testing::_)).Times(1).WillOnce(Return(1));
+  EXPECT_CALL(*fsimpl, createAndOpenFile(Eq(FILENAME), testing::_, testing::_, testing::_, testing::_)).Times(1).WillOnce(Return(1));
   //For the syscall to succeed, we also need to give an fstat implementation.
   ReturnIsFileOnFstat(1);
 
@@ -26,7 +26,7 @@ TEST_F(FuseCreateAndOpenErrorTest, ReturnNoError) {
 
 TEST_P(FuseCreateAndOpenErrorTest, ReturnError) {
   ReturnDoesntExistOnLstat(FILENAME);
-  EXPECT_CALL(*fsimpl, createAndOpenFile(Eq(FILENAME), testing::_, testing::_, testing::_)).Times(1).WillOnce(Throw(FuseErrnoException(GetParam())));
+  EXPECT_CALL(*fsimpl, createAndOpenFile(Eq(FILENAME), testing::_, testing::_, testing::_, testing::_)).Times(1).WillOnce(Throw(FuseErrnoException(GetParam())));
 
   const int error = CreateAndOpenFileReturnError(FILENAME, O_RDONLY);
   EXPECT_EQ(GetParam(), error);

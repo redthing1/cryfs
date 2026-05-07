@@ -1,17 +1,8 @@
 #include "CryConfigFile.h"
-#include <fstream>
 #include <boost/filesystem.hpp>
-#include <sstream>
 #include <cpp-utils/logging/logging.h>
 
 using boost::none;
-using std::ifstream;
-using std::ofstream;
-using std::string;
-using std::istringstream;
-using std::ostringstream;
-using std::stringstream;
-using std::istream;
 using cpputils::Data;
 using cpputils::unique_ref;
 using cpputils::make_unique_ref;
@@ -44,12 +35,6 @@ either<CryConfigFile::LoadError, unique_ref<CryConfigFile>> CryConfigFile::load(
         return LoadError::DecryptionFailed;
     }
     auto configFile = make_unique_ref<CryConfigFile>(CryConfigFile(std::move(path), std::move(config), std::move(*encryptor), access));
-    if (decrypted->wasInDeprecatedConfigFormat) {
-        if (access == Access::ReadWrite) {
-            // Migrate it to new format
-            configFile->save();
-        }
-    }
     #if !defined(__clang__) && !defined(_MSC_VER) && defined(__GNUC__) && __GNUC__ < 8
         return std::move(configFile);
     #else

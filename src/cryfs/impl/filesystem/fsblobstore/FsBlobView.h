@@ -100,10 +100,6 @@ namespace cryfs {
             return actualFormatVersion;
         }
 
-#ifndef CRYFS_NO_COMPATIBILITY
-        static void migrate(blobstore::Blob *blob, const blockstore::BlockId &parentId);
-#endif
-
     private:
         static constexpr uint16_t FORMAT_VERSION_HEADER = 1;
         static constexpr unsigned int HEADER_SIZE = sizeof(FORMAT_VERSION_HEADER) + sizeof(uint8_t) + blockstore::BlockId::BINARY_LENGTH;

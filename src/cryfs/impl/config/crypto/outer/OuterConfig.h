@@ -10,7 +10,6 @@ namespace cryfs {
     struct OuterConfig final {
         cpputils::Data kdfParameters;
         cpputils::Data encryptedInnerConfig;
-        bool wasInDeprecatedConfigFormat;
 
         cpputils::Data serialize() const;
         static boost::optional<OuterConfig> deserialize(const cpputils::Data &data);
@@ -21,10 +20,6 @@ namespace cryfs {
         static OuterConfig _deserializeNewFormat(cpputils::Deserializer *deserializer);
 
         static const std::string HEADER;
-#ifndef CRYFS_NO_COMPATIBILITY
-        static const std::string OLD_HEADER;
-        static OuterConfig _deserializeOldFormat(cpputils::Deserializer *deserializer);
-#endif
     };
 }
 

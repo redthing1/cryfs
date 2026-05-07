@@ -66,5 +66,13 @@ void LowToHighLevelBlockStore::forEachBlock(std::function<void (const BlockId &)
     _baseBlockStore->forEachBlock(std::move(callback));
 }
 
+void LowToHighLevelBlockStore::flush() {
+    _baseBlockStore->flush();
+}
+
+void LowToHighLevelBlockStore::sync() {
+    _baseBlockStore->sync();
+}
+
 }
 }

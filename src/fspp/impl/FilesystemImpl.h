@@ -39,8 +39,9 @@ public:
 	void write(int descriptor, const void *buf, fspp::num_bytes_t count, fspp::num_bytes_t offset) override;
 	void fsync(int descriptor) override;
 	void fdatasync(int descriptor) override;
+	void syncDir(const boost::filesystem::path &path) override;
 	void access(const boost::filesystem::path &path, int mask) override;
-	int createAndOpenFile(const boost::filesystem::path &path, ::mode_t mode, ::uid_t uid, ::gid_t gid) override;
+	int createAndOpenFile(const boost::filesystem::path &path, ::mode_t mode, ::uid_t uid, ::gid_t gid, int flags) override;
 	void mkdir(const boost::filesystem::path &path, ::mode_t mode, ::uid_t uid, ::gid_t gid) override;
 	void rmdir(const boost::filesystem::path &path) override;
 	void unlink(const boost::filesystem::path &path) override;
@@ -75,6 +76,7 @@ private:
     std::atomic<uint64_t> _writeNanosec;
     std::atomic<uint64_t> _fsyncNanosec;
     std::atomic<uint64_t> _fdatasyncNanosec;
+    std::atomic<uint64_t> _syncDirNanosec;
     std::atomic<uint64_t> _accessNanosec;
     std::atomic<uint64_t> _createAndOpenFileNanosec;
     std::atomic<uint64_t> _createAndOpenFileNanosec_withoutLoading;

@@ -33,12 +33,6 @@ using ::testing::NiceMock;
   EXPECT_CALL(*console, ask(HasSubstr("block size"), testing::_)).Times(1)
 #define EXPECT_DOES_NOT_ASK_FOR_BLOCKSIZE()                                                                            \
   EXPECT_CALL(*console, ask(HasSubstr("block size"), testing::_)).Times(0)
-#define EXPECT_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION()                                                              \
-  EXPECT_CALL(*console, askYesNo(HasSubstr("missing block"), false)).Times(1)
-#define EXPECT_DOES_NOT_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION()                                                     \
-  EXPECT_CALL(*console, askYesNo(HasSubstr("missing block"), false)).Times(0)
-#define IGNORE_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION()                                                              \
-  EXPECT_CALL(*console, askYesNo(HasSubstr("missing block"), false))
 
 class CryConfigCreatorTest: public ::testing::Test, TestWithFakeHomeDirectory {
 public:
@@ -67,116 +61,88 @@ public:
 
 TEST_F(CryConfigCreatorTest, DoesAskForCipherIfNotSpecified) {
     AnswerNoToDefaultSettings();
-    IGNORE_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
     EXPECT_ASK_FOR_CIPHER().WillOnce(ChooseAnyCipher());
-    const CryConfig config = creator.create(none, none, none, false).config;
+    const CryConfig config = creator.create(none, none, false).config;
 }
 
 TEST_F(CryConfigCreatorTest, DoesNotAskForCipherIfSpecified) {
     AnswerNoToDefaultSettings();
-    IGNORE_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
     EXPECT_DOES_NOT_ASK_FOR_CIPHER();
-    const CryConfig config = creator.create(string("aes-256-gcm"), none, none, false).config;
+    const CryConfig config = creator.create(string("aes-256-gcm"), none, false).config;
 }
 
 TEST_F(CryConfigCreatorTest, DoesNotAskForCipherIfUsingDefaultSettings) {
     AnswerYesToDefaultSettings();
     EXPECT_DOES_NOT_ASK_FOR_CIPHER();
-    const CryConfig config = creator.create(none, none, none, false).config;
+    const CryConfig config = creator.create(none, none, false).config;
 }
 
 TEST_F(CryConfigCreatorTest, DoesNotAskForCipherIfNoninteractive) {
     EXPECT_DOES_NOT_ASK_TO_USE_DEFAULT_SETTINGS();
     EXPECT_DOES_NOT_ASK_FOR_CIPHER();
-    const CryConfig config = noninteractiveCreator.create(none, none, none, false).config;
+    const CryConfig config = noninteractiveCreator.create(none, none, false).config;
 }
 
 TEST_F(CryConfigCreatorTest, DoesAskForBlocksizeIfNotSpecified) {
     AnswerNoToDefaultSettings();
-    IGNORE_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
     EXPECT_ASK_FOR_BLOCKSIZE().WillOnce(Return(1));
-    const CryConfig config = creator.create(none, none, none, false).config;
+    const CryConfig config = creator.create(none, none, false).config;
 }
 
 TEST_F(CryConfigCreatorTest, DoesNotAskForBlocksizeIfSpecified) {
     AnswerNoToDefaultSettings();
-    IGNORE_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
     EXPECT_DOES_NOT_ASK_FOR_BLOCKSIZE();
-    const CryConfig config = creator.create(none, 10*1024u, none, false).config;
+    const CryConfig config = creator.create(none, 10*1024u, false).config;
 }
 
 TEST_F(CryConfigCreatorTest, DoesNotAskForBlocksizeIfNoninteractive) {
     EXPECT_DOES_NOT_ASK_TO_USE_DEFAULT_SETTINGS();
     EXPECT_DOES_NOT_ASK_FOR_BLOCKSIZE();
-    const CryConfig config = noninteractiveCreator.create(none, none, none, false).config;
+    const CryConfig config = noninteractiveCreator.create(none, none, false).config;
 }
 
 TEST_F(CryConfigCreatorTest, DoesNotAskForBlocksizeIfUsingDefaultSettings) {
     AnswerYesToDefaultSettings();
     EXPECT_DOES_NOT_ASK_FOR_BLOCKSIZE();
-    const CryConfig config = creator.create(none, none, none, false).config;
+    const CryConfig config = creator.create(none, none, false).config;
 }
 
-TEST_F(CryConfigCreatorTest, DoesAskWhetherMissingBlocksAreIntegrityViolationsIfNotSpecified) {
-    AnswerNoToDefaultSettings();
-    EXPECT_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION().WillOnce(Return(true));
-    const CryConfig config = creator.create(none, none, none, false).config;
+TEST_F(CryConfigCreatorTest, CreatesNewConfigWithoutExclusiveClientPolicy) {
+    const CryConfig config = noninteractiveCreator.create(none, none, false).config;
+    EXPECT_EQ(string::npos, config.save().ToString().find("exclusiveClientId"));
 }
 
-TEST_F(CryConfigCreatorTest, DoesNotAskWhetherMissingBlocksAreIntegrityViolationsIfSpecified_True) {
-    AnswerNoToDefaultSettings();
-    EXPECT_DOES_NOT_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
-    const CryConfig config = creator.create(none, none, true, false).config;
-}
-
-TEST_F(CryConfigCreatorTest, DoesNotAskWhetherMissingBlocksAreIntegrityViolationsIfSpecified_False) {
-    AnswerNoToDefaultSettings();
-    EXPECT_DOES_NOT_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
-    const CryConfig config = creator.create(none, none, false, false).config;
-}
-
-TEST_F(CryConfigCreatorTest, DoesNotAskWhetherMissingBlocksAreIntegrityViolationsIfNoninteractive) {
-    EXPECT_DOES_NOT_ASK_TO_USE_DEFAULT_SETTINGS();
-    EXPECT_DOES_NOT_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
-    const CryConfig config = noninteractiveCreator.create(none, none, none, false).config;
-}
-
-TEST_F(CryConfigCreatorTest, DoesNotAskWhetherMissingBlocksAreIntegrityViolationsIfUsingDefaultSettings) {
-    AnswerYesToDefaultSettings();
-    EXPECT_DOES_NOT_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
-    const CryConfig config = creator.create(none, none, none, false).config;
+TEST_F(CryConfigCreatorTest, CreatesNewConfigWithoutLegacyMigrationMarkers) {
+    const CryConfig config = noninteractiveCreator.create(none, none, false).config;
+    EXPECT_EQ(string::npos, config.save().ToString().find("migrations"));
 }
 
 TEST_F(CryConfigCreatorTest, ChoosesEmptyRootBlobId) {
     AnswerNoToDefaultSettings();
-    IGNORE_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
-    const CryConfig config = creator.create(none, none, none, false).config;
+    const CryConfig config = creator.create(none, none, false).config;
     EXPECT_EQ("", config.RootBlob()); // This tells CryFS to create a new root blob
 }
 
 TEST_F(CryConfigCreatorTest, ChoosesValidEncryptionKey_448) {
     AnswerNoToDefaultSettings();
-    IGNORE_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
     EXPECT_ASK_FOR_CIPHER().WillOnce(ChooseCipher("mars-448-gcm"));
-    const CryConfig config = creator.create(none, none, none, false).config;
+    const CryConfig config = creator.create(none, none, false).config;
     // Verify key has the correct size for Mars-448-GCM
     EXPECT_EQ(cpputils::Mars448_GCM::KEYSIZE, config.EncryptionKey().binaryLength());
 }
 
 TEST_F(CryConfigCreatorTest, ChoosesValidEncryptionKey_256) {
     AnswerNoToDefaultSettings();
-    IGNORE_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
     EXPECT_ASK_FOR_CIPHER().WillOnce(ChooseCipher("aes-256-gcm"));
-    const CryConfig config = creator.create(none, none, none, false).config;
+    const CryConfig config = creator.create(none, none, false).config;
     // Verify key has the correct size for AES-256-GCM
     EXPECT_EQ(cpputils::AES256_GCM::KEYSIZE, config.EncryptionKey().binaryLength());
 }
 
 TEST_F(CryConfigCreatorTest, ChoosesValidEncryptionKey_128) {
     AnswerNoToDefaultSettings();
-    IGNORE_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
     EXPECT_ASK_FOR_CIPHER().WillOnce(ChooseCipher("aes-128-gcm"));
-    const CryConfig config = creator.create(none, none, none, false).config;
+    const CryConfig config = creator.create(none, none, false).config;
     // Verify key has the correct size for AES-128-GCM
     EXPECT_EQ(cpputils::AES128_GCM::KEYSIZE, config.EncryptionKey().binaryLength());
 }
@@ -184,21 +150,21 @@ TEST_F(CryConfigCreatorTest, ChoosesValidEncryptionKey_128) {
 TEST_F(CryConfigCreatorTest, DoesNotAskForAnythingIfEverythingIsSpecified) {
     EXPECT_DOES_NOT_ASK_TO_USE_DEFAULT_SETTINGS();
     EXPECT_DOES_NOT_ASK_FOR_CIPHER();
-    const CryConfig config = noninteractiveCreator.create(string("aes-256-gcm"), 10*1024u, none, false).config;
+    const CryConfig config = noninteractiveCreator.create(string("aes-256-gcm"), 10*1024u, false).config;
 }
 
 TEST_F(CryConfigCreatorTest, SetsCorrectCreatedWithVersion) {
-    const CryConfig config = noninteractiveCreator.create(none, none, none, false).config;
+    const CryConfig config = noninteractiveCreator.create(none, none, false).config;
     EXPECT_EQ(gitversion::VersionString(), config.CreatedWithVersion());
 }
 
 TEST_F(CryConfigCreatorTest, SetsCorrectLastOpenedWithVersion) {
-    const CryConfig config = noninteractiveCreator.create(none, none, none, false).config;
+    const CryConfig config = noninteractiveCreator.create(none, none, false).config;
     EXPECT_EQ(gitversion::VersionString(), config.CreatedWithVersion());
 }
 
 TEST_F(CryConfigCreatorTest, SetsCorrectVersion) {
-    const CryConfig config = noninteractiveCreator.create(none, none, none, false).config;
+    const CryConfig config = noninteractiveCreator.create(none, none, false).config;
     EXPECT_EQ(CryConfig::FilesystemFormatVersion, config.Version());
 }
 

@@ -106,5 +106,11 @@ void FakeBlockStore::forEachBlock(std::function<void (const BlockId &)> callback
   }
 }
 
+void FakeBlockStore::flush() {
+}
+
+void FakeBlockStore::sync() {
+}
+
 }
 }

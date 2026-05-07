@@ -1,10 +1,12 @@
 #include "LocalStateMetadata.h"
+#include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <cpp-utils/random/Random.h>
-#include <boost/filesystem.hpp>
+#include <cpp-utils/system/AtomicFile.h>
 #include <blockstore/implementations/integrity/KnownBlockVersions.h>
 #include <cryfs/impl/CryfsException.h>
+#include <sstream>
 
 using boost::optional;
 using boost::none;
@@ -12,9 +14,9 @@ using boost::property_tree::ptree;
 using boost::property_tree::write_json;
 using boost::property_tree::read_json;
 using std::ifstream;
-using std::ofstream;
 using std::istream;
 using std::ostream;
+using std::ostringstream;
 using std::string;
 using blockstore::integrity::KnownBlockVersions;
 using cpputils::hash::Hash;
@@ -42,17 +44,25 @@ LocalStateMetadata LocalStateMetadata::loadOrGenerate(const bf::path &statePath,
 }
 
 optional<LocalStateMetadata> LocalStateMetadata::load_(const bf::path &metadataFilePath) {
-  ifstream file(metadataFilePath.string());
-  if (!file.good()) {
+  if (!bf::exists(metadataFilePath)) {
     // State file doesn't exist
     return none;
+  }
+  if (!bf::is_regular_file(metadataFilePath)) {
+    throw std::runtime_error("Invalid local state metadata: Metadata path is not a regular file.");
+  }
+  ifstream file(metadataFilePath.string());
+  if (!file.good()) {
+    throw std::runtime_error("Invalid local state metadata: Could not read metadata file.");
   }
   return deserialize_(file);
 }
 
 void LocalStateMetadata::save_(const bf::path &metadataFilePath) const {
-  ofstream file(metadataFilePath.string(), std::ios::trunc);
-  serialize_(file);
+  ostringstream stream;
+  serialize_(stream);
+  const string serialized = stream.str();
+  cpputils::storeFileAtomically(metadataFilePath, serialized.data(), serialized.size());
 }
 
 namespace {
@@ -65,32 +75,10 @@ uint32_t generateClientId_() {
   return result;
 }
 
-#ifndef CRYFS_NO_COMPATIBILITY
-optional<uint32_t> _tryLoadClientIdFromLegacyFile(const bf::path &metadataFilePath) {
-  auto myClientIdFile = metadataFilePath.parent_path() / "myClientId";
-  ifstream file(myClientIdFile.string());
-  if (!file.good()) {
-    return none;
-  }
-
-  uint32_t value = 0;
-  file >> value;
-  file.close();
-  bf::remove(myClientIdFile);
-  return value;
-}
-#endif
 }
 
 LocalStateMetadata LocalStateMetadata::generate_(const bf::path &metadataFilePath, const cpputils::EncryptionKey& encryptionKey) {
   uint32_t myClientId = generateClientId_();
-#ifndef CRYFS_NO_COMPATIBILITY
-  // In the old format, this was stored in a "myClientId" file. If that file exists, load it from there.
-  optional<uint32_t> legacy = _tryLoadClientIdFromLegacyFile(metadataFilePath);
-  if (legacy != none) {
-    myClientId = *legacy;
-  }
-#endif
 
   LocalStateMetadata result(myClientId, encryptionKey.hash(cpputils::hash::generateSalt()));
   result.save_(metadataFilePath);

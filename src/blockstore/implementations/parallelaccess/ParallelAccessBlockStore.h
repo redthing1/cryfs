@@ -25,6 +25,8 @@ public:
   uint64_t estimateNumFreeBytes() const override;
   uint64_t blockSizeFromPhysicalBlockSize(uint64_t blockSize) const override;
   void forEachBlock(std::function<void (const BlockId &)> callback) const override;
+  void flush() override;
+  void sync() override;
 
 private:
   cpputils::unique_ref<BlockStore> _baseBlockStore;

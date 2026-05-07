@@ -81,6 +81,13 @@ vector<fspp::Dir::Entry> CryDir::children() {
   return children;
 }
 
+void CryDir::fsync() {
+  device()->callFsActionCallbacks();
+  auto blob = LoadBlob();
+  blob->flush();
+  device()->sync();
+}
+
 size_t CryDir::numChildren() {
   auto blob = LoadBlob();
   return blob->NumChildren();

@@ -14,6 +14,7 @@
 #include <cpp-utils/logging/logging.h>
 #include <cpp-utils/process/subprocess.h>
 #include <cpp-utils/thread/debugging.h>
+#include <cerrno>
 #include <csignal>
 #include "InvalidFilesystem.h"
 #include <codecvt>
@@ -1229,14 +1230,35 @@ int Fuse::releasedir(const bf::path &path, fuse_file_info *fileinfo) {
   return 0;
 }
 
-//TODO
 int Fuse::fsyncdir(const bf::path &path, int datasync, fuse_file_info *fileinfo) {
   UNUSED(fileinfo);
-  UNUSED(datasync);
-  UNUSED(path);
   const ThreadNameForDebugging _threadName("fsyncdir");
-  //LOG(WARN, "Called non-implemented fsyncdir({}, {}, _)", path, datasync);
-  return 0;
+#ifdef FSPP_LOG
+  LOG(DEBUG, "fsyncdir({}, {}, _)", path.string(), datasync);
+#endif
+  UNUSED(datasync);
+  try {
+    ASSERT(is_valid_fspp_path(path), "has to be an absolute path");
+    _fs->syncDir(path);
+#ifdef FSPP_LOG
+    LOG(DEBUG, "fsyncdir({}, {}, _): success", path.string(), datasync);
+#endif
+    return 0;
+  } catch(const cpputils::AssertFailed &e) {
+    LOG(ERR, "AssertFailed in Fuse::fsyncdir: {}", e.what());
+    return -EIO;
+  } catch (FuseErrnoException &e) {
+#ifdef FSPP_LOG
+    LOG(WARN, "fsyncdir({}, {}, _): failed with errno {}", path, datasync, e.getErrno());
+#endif
+    return -e.getErrno();
+  } catch(const std::exception &e) {
+    _logException(e);
+    return -EIO;
+  } catch(...) {
+    _logUnknownException();
+    return -EIO;
+  }
 }
 
 void Fuse::init(fuse_conn_info *conn) {
@@ -1302,7 +1324,7 @@ int Fuse::create(const bf::path &path, ::mode_t mode, fuse_file_info *fileinfo) 
   try {
     ASSERT(is_valid_fspp_path(path), "has to be an absolute path");
     auto context = fuse_get_context();
-    fileinfo->fh = _fs->createAndOpenFile(path, mode, context->uid, context->gid);
+    fileinfo->fh = _fs->createAndOpenFile(path, mode, context->uid, context->gid, fileinfo->flags);
 #ifdef FSPP_LOG
     LOG(DEBUG, "create({}, {}, _): success", path, mode);
 #endif

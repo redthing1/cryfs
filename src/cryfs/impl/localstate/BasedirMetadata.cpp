@@ -5,15 +5,15 @@
 #include <boost/filesystem/operations.hpp>
 #include "LocalStateDir.h"
 #include <cpp-utils/logging/logging.h>
+#include <cpp-utils/system/AtomicFile.h>
+#include <sstream>
 
 namespace bf = boost::filesystem;
 using boost::property_tree::ptree;
 using boost::property_tree::write_json;
 using boost::property_tree::read_json;
-using std::ostream;
-using std::istream;
 using std::ifstream;
-using std::ofstream;
+using std::ostringstream;
 using std::string;
 using namespace cpputils::logging;
 
@@ -39,8 +39,10 @@ ptree _load(const bf::path &metadataFilePath) {
 }
 
 void _save(const bf::path &metadataFilePath, const ptree& data) {
-  ofstream file(metadataFilePath.string(), std::ios::trunc);
-  write_json(file, data);
+  ostringstream stream;
+  write_json(stream, data);
+  const string serialized = stream.str();
+  cpputils::storeFileAtomically(metadataFilePath, serialized.data(), serialized.size());
 }
 
 string jsonPathForBasedir(const bf::path &basedir) {

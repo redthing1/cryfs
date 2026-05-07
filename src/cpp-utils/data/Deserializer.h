@@ -117,6 +117,9 @@ namespace cpputils {
     }
 
     inline void Deserializer::_readData(void *target, size_t size) {
+        if (_pos > _source->size() || size > _source->size() - _pos) {
+            throw std::runtime_error("Deserialization failed - size overflow");
+        }
         std::memcpy(static_cast<char*>(target), static_cast<const char*>(_source->dataOffset(_pos)), size);
         _pos += size;
     }
