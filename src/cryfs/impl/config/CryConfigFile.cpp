@@ -43,10 +43,11 @@ either<CryConfigFile::LoadError, unique_ref<CryConfigFile>> CryConfigFile::load(
         LOG(ERR, "Inner cipher algorithm used to encrypt config file doesn't match config value");
         return LoadError::DecryptionFailed;
     }
-    auto configFile = make_unique_ref<CryConfigFile>(CryConfigFile(std::move(path), std::move(config), std::move(*encryptor), access));
+    auto configFile = make_unique_ref<CryConfigFile>(CryConfigFile(path, std::move(config), std::move(*encryptor), access));
     if (decrypted->wasInDeprecatedConfigFormat) {
         if (access == Access::ReadWrite) {
-            // Migrate it to new format
+            // Rewrap only after the old config has authenticated and parsed.
+            configFile->_encryptor = CryConfigEncryptorFactory::deriveNewKey(keyProvider);
             configFile->save();
         }
     }
@@ -76,7 +77,7 @@ void CryConfigFile::save() const {
     }
     const Data configData = _config.save();
     auto encrypted = _encryptor->encrypt(configData, _config.Cipher());
-    encrypted.StoreToFile(_path);
+    encrypted.StoreToFileAtomically(_path);
 }
 
 CryConfig *CryConfigFile::config() {

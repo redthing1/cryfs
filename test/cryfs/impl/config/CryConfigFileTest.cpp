@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <cryfs/impl/config/CryConfigFile.h>
+#include <cryfs/impl/config/crypto/outer/OuterConfig.h>
 #include <cpp-utils/tempfile/TempFile.h>
 #include <cpp-utils/pointer/unique_ref_boost_optional_gtest_workaround.h>
 #include "../../impl/testutils/FakeCryKeyProvider.h"
@@ -45,6 +46,15 @@ public:
         CryConfigFile::create(file.path(), std::move(cfg), &keyProvider);
     }
 
+    void CreateLegacy(CryConfig cfg, unsigned int keySeed = 0) {
+        FakeCryKeyProvider keyProvider(keySeed);
+        auto key = keyProvider.requestKeyForNewFilesystem(
+          ConfigKdf::Scrypt, CryConfigEncryptor::MaxTotalKeySize);
+        CryConfigEncryptor encryptor(
+          std::move(key.key), std::move(key.kdfParameters));
+        encryptor.encrypt(cfg.save(), cfg.Cipher()).StoreToFile(file.path());
+    }
+
     optional<unique_ref<CryConfigFile>> Load(unsigned char keySeed = 0) {
         FakeCryKeyProvider keyProvider(keySeed);
         return CryConfigFile::load(file.path(), &keyProvider, CryConfigFile::Access::ReadWrite).right_opt();
@@ -68,6 +78,44 @@ TEST_F(CryConfigFileTest, DoesntLoadIfWrongPassword) {
     Create(Config(), pw1);
     auto loaded = Load(pw2);
     EXPECT_EQ(none, loaded);
+}
+
+TEST_F(CryConfigFileTest, MigratesAuthenticatedLegacyConfigToArgon2id) {
+    auto config = Config();
+    config.SetRootBlob("legacy-root");
+    CreateLegacy(std::move(config));
+
+    auto loaded = Load().value();
+
+    EXPECT_EQ("legacy-root", loaded->config()->RootBlob());
+    const auto migrated = OuterConfig::deserialize(
+      Data::LoadFromFile(file.path()).value()).value();
+    EXPECT_EQ(ConfigKdf::Argon2id, migrated.kdf);
+}
+
+TEST_F(CryConfigFileTest, ReadOnlyLoadDoesNotMigrateLegacyConfig) {
+    CreateLegacy(Config());
+    FakeCryKeyProvider keyProvider;
+
+    auto loaded = CryConfigFile::load(
+      file.path(), &keyProvider, CryConfigFile::Access::ReadOnly);
+
+    ASSERT_TRUE(loaded.is_right());
+    const auto outer = OuterConfig::deserialize(
+      Data::LoadFromFile(file.path()).value()).value();
+    EXPECT_EQ(ConfigKdf::Scrypt, outer.kdf);
+}
+
+TEST_F(CryConfigFileTest, FailedLegacyAuthenticationDoesNotRewriteConfig) {
+    CreateLegacy(Config(), 1);
+    const auto before = Data::LoadFromFile(file.path()).value();
+    FakeCryKeyProvider wrongKey(2);
+
+    auto loaded = CryConfigFile::load(
+      file.path(), &wrongKey, CryConfigFile::Access::ReadWrite);
+
+    EXPECT_TRUE(loaded.is_left());
+    EXPECT_EQ(before, Data::LoadFromFile(file.path()).value());
 }
 
 TEST_F(CryConfigFileTest, RootBlob_Init) {

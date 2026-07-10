@@ -97,7 +97,7 @@ void IOStreamConsole::print(const string &output) {
     *_output << output << std::flush;
 }
 
-string IOStreamConsole::askPassword(const string &question) {
+SensitivePassword IOStreamConsole::askPassword(const string &question) {
     const DontEchoStdinToStdoutRAII _stdin_input_is_hidden_as_long_as_this_is_in_scope;
 
     *_output << question << std::flush;
@@ -107,7 +107,7 @@ string IOStreamConsole::askPassword(const string &question) {
 
     ASSERT(result.size() == 0 || result[result.size() - 1] != '\n', "Unexpected std::getline() behavior");
 
-    return result;
+    return SensitivePassword::FromString(std::move(result));
 }
 
 }

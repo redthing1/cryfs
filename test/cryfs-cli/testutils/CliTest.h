@@ -51,10 +51,16 @@ public:
             _args.emplace_back(arg.c_str());
         }
         auto *keyGenerator = cpputils::Random::Csprng();
-        ON_CALL(*console, askPassword(testing::StrEq("Password: "))).WillByDefault(testing::Return("pass"));
-        ON_CALL(*console, askPassword(testing::StrEq("Confirm Password: "))).WillByDefault(testing::Return("pass"));
+        ON_CALL(*console, askPassword(testing::StrEq("Password: "))).WillByDefault(testing::InvokeWithoutArgs([] {
+            return cpputils::SensitivePassword::FromString("pass");
+        }));
+        ON_CALL(*console, askPassword(testing::StrEq("Confirm Password: "))).WillByDefault(testing::InvokeWithoutArgs([] {
+            return cpputils::SensitivePassword::FromString("pass");
+        }));
         // Run Cryfs
-        return cryfs_cli::Cli(keyGenerator, cpputils::SCrypt::TestSettings, console).main(
+        return cryfs_cli::Cli(
+            keyGenerator, cpputils::SCrypt::TestSettings,
+            cpputils::Argon2id::TestSettings, console).main(
             _args.size(),
             _args.data(),
             #ifdef CRYFS_UPDATE_CHECKS

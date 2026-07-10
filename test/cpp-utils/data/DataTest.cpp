@@ -112,6 +112,25 @@ TEST_P(DataTestWithSizeParam, StoreAndLoad) {
   EXPECT_EQ(randomData, loaded_data);
 }
 
+TEST_F(DataTest, StoreToFileAtomicallyCreatesFile) {
+  const TempFile file(false);
+  const Data data = DataFixture::generate(64);
+
+  data.StoreToFileAtomically(file.path());
+
+  EXPECT_EQ(data, Data::LoadFromFile(file.path()).value());
+}
+
+TEST_F(DataTest, StoreToFileAtomicallyReplacesFile) {
+  const TempFile file;
+  DataFixture::generate(32, 1).StoreToFile(file.path());
+  const Data replacement = DataFixture::generate(64, 2);
+
+  replacement.StoreToFileAtomically(file.path());
+
+  EXPECT_EQ(replacement, Data::LoadFromFile(file.path()).value());
+}
+
 TEST_P(DataTestWithSizeParam, Copy) {
   const Data copy = randomData.copy();
   EXPECT_EQ(randomData, copy);

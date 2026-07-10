@@ -4,6 +4,9 @@ set(SOURCES
     crypto/symmetric/CipherTest.cpp
     crypto/kdf/SCryptTest.cpp
     crypto/kdf/SCryptParametersTest.cpp
+    crypto/kdf/Argon2idTest.cpp
+    crypto/kdf/Argon2idParametersTest.cpp
+    crypto/kdf/SensitivePasswordTest.cpp
     crypto/hash/HashTest.cpp
     MacrosIncludeTest.cpp
     pointer/unique_ref_test.cpp

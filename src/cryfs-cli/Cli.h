@@ -9,6 +9,8 @@
 #include <cpp-utils/io/Console.h>
 #include <cpp-utils/random/RandomGenerator.h>
 #include <cpp-utils/network/HttpClient.h>
+#include <cpp-utils/crypto/kdf/Argon2id.h>
+#include <cpp-utils/crypto/kdf/Scrypt.h>
 #include <cryfs/impl/filesystem/CryDevice.h>
 #include "CallAfterTimeout.h"
 #include <cryfs/impl/config/CryConfigLoader.h>
@@ -17,7 +19,10 @@
 namespace cryfs_cli {
     class Cli final {
     public:
-        Cli(cpputils::RandomGenerator *keyGenerator, const cpputils::SCryptSettings& scryptSettings, std::shared_ptr<cpputils::Console> console);
+        Cli(cpputils::RandomGenerator *keyGenerator,
+            const cpputils::SCryptSettings& scryptSettings,
+            const cpputils::Argon2idSettings& argon2idSettings,
+            std::shared_ptr<cpputils::Console> console);
 
         int main(
             int argc,
@@ -37,11 +42,11 @@ namespace cryfs_cli {
         void _checkConfigIntegrity(const boost::filesystem::path& basedir, const cryfs::LocalStateDir& localStateDir, const cryfs::CryConfigFile& config, bool allowReplacedFilesystem);
         cpputils::either<cryfs::CryConfigFile::LoadError, cryfs::CryConfigLoader::ConfigLoadResult> _loadOrCreateConfigFile(boost::filesystem::path configFilePath, cryfs::LocalStateDir localStateDir, const boost::optional<std::string> &cipher, const boost::optional<uint32_t> &blocksizeBytes, bool allowFilesystemUpgrade, const boost::optional<bool> &missingBlockIsIntegrityViolation, bool allowReplacedFilesystem);
         boost::filesystem::path _determineConfigFile(const program_options::ProgramOptions &options);
-        static std::function<std::string()> _askPasswordForExistingFilesystem(std::shared_ptr<cpputils::Console> console);
-        static std::function<std::string()> _askPasswordForNewFilesystem(std::shared_ptr<cpputils::Console> console);
-        static std::function<std::string()> _askPasswordNoninteractive(std::shared_ptr<cpputils::Console> console);
-        static bool _confirmPassword(cpputils::Console* console, const std::string &password);
-        static bool _checkPassword(const std::string &password);
+        static std::function<cpputils::SensitivePassword()> _askPasswordForExistingFilesystem(std::shared_ptr<cpputils::Console> console);
+        static std::function<cpputils::SensitivePassword()> _askPasswordForNewFilesystem(std::shared_ptr<cpputils::Console> console);
+        static std::function<cpputils::SensitivePassword()> _askPasswordNoninteractive(std::shared_ptr<cpputils::Console> console);
+        static bool _confirmPassword(cpputils::Console* console, const cpputils::SensitivePassword &password);
+        static bool _checkPassword(const cpputils::SensitivePassword &password);
         void _showVersion();
         void _initLogfile(const program_options::ProgramOptions &options);
         void _sanityChecks(const program_options::ProgramOptions &options);
@@ -56,6 +61,7 @@ namespace cryfs_cli {
 
         cpputils::RandomGenerator *_keyGenerator;
         cpputils::SCryptSettings _scryptSettings;
+        cpputils::Argon2idSettings _argon2idSettings;
         std::shared_ptr<cpputils::Console> _console;
         bool _noninteractive;
         boost::optional<cpputils::unique_ref<CallAfterTimeout>> _idleUnmounter;

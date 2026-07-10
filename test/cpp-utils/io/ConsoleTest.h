@@ -23,7 +23,7 @@ public:
             return _console.askYesNo(question, true);
         });
     }
-    std::future<std::string> askPassword(const std::string &question) {
+    std::future<cpputils::SensitivePassword> askPassword(const std::string &question) {
         return std::async(std::launch::async, [this, question]() {
             return _console.askPassword(question);
         });
@@ -68,7 +68,7 @@ public:
         return _console.askYesNo(question);
     }
 
-    std::future<std::string> askPassword(const std::string &question) {
+    std::future<cpputils::SensitivePassword> askPassword(const std::string &question) {
         return _console.askPassword(question);
     }
 

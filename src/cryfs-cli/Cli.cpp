@@ -27,6 +27,7 @@
 #include "Environment.h"
 #include <cryfs/impl/CryfsException.h>
 #include <cpp-utils/thread/debugging.h>
+#include <cpp-utils/crypto/kdf/Argon2id.h>
 
 //TODO Many functions accessing the ProgramOptions object. Factor out into class that stores it as a member.
 //TODO Factor out class handling askPassword
@@ -45,8 +46,10 @@ using cpputils::TempFile;
 using cpputils::RandomGenerator;
 using cpputils::unique_ref;
 using cpputils::SCrypt;
+using cpputils::Argon2id;
 using cpputils::either;
 using cpputils::SCryptSettings;
+using cpputils::SensitivePassword;
 using cpputils::Console;
 using cpputils::HttpClient;
 using std::cout;
@@ -71,8 +74,13 @@ using gitversion::VersionCompare;
 
 namespace cryfs_cli {
 
-    Cli::Cli(RandomGenerator *keyGenerator, const SCryptSettings &scryptSettings, shared_ptr<Console> console):
-            _keyGenerator(keyGenerator), _scryptSettings(scryptSettings), _console(), _noninteractive(Environment::isNoninteractive()), _idleUnmounter(none), _device(none) {
+    Cli::Cli(RandomGenerator *keyGenerator, const SCryptSettings &scryptSettings,
+             const cpputils::Argon2idSettings &argon2idSettings,
+             shared_ptr<Console> console):
+            _keyGenerator(keyGenerator), _scryptSettings(scryptSettings),
+            _argon2idSettings(argon2idSettings), _console(),
+            _noninteractive(Environment::isNoninteractive()),
+            _idleUnmounter(none), _device(none) {
         
         if (_noninteractive) {
             _console = make_shared<NoninteractiveConsole>(console);
@@ -118,17 +126,17 @@ namespace cryfs_cli {
     }
 #endif
 
-    bool Cli::_checkPassword(const string &password) {
-        if (password == "") {
+    bool Cli::_checkPassword(const SensitivePassword &password) {
+        if (password.empty()) {
             std::cerr << "Empty password not allowed. Please try again." << std::endl;
             return false;
         }
         return true;
     }
 
-    function<string()> Cli::_askPasswordForExistingFilesystem(std::shared_ptr<cpputils::Console> console) {
+    function<SensitivePassword()> Cli::_askPasswordForExistingFilesystem(std::shared_ptr<cpputils::Console> console) {
         return [console] () {
-            string password = console->askPassword("Password: ");
+            SensitivePassword password = console->askPassword("Password: ");
             while (!_checkPassword(password)) {
                 password = console->askPassword("Password: ");
             }
@@ -136,10 +144,10 @@ namespace cryfs_cli {
         };
     };
 
-    function<string()> Cli::_askPasswordForNewFilesystem(std::shared_ptr<cpputils::Console> console) {
+    function<SensitivePassword()> Cli::_askPasswordForNewFilesystem(std::shared_ptr<cpputils::Console> console) {
         //TODO Ask confirmation if using insecure password (<8 characters)
         return [console] () {
-            string password;
+            SensitivePassword password;
             bool again = true;
             while(again) {
                 password = console->askPassword("Password: ");
@@ -157,19 +165,19 @@ namespace cryfs_cli {
         };
     }
 
-    bool Cli::_confirmPassword(cpputils::Console* console, const string &password) {
-        const string confirmPassword = console->askPassword("Confirm Password: ");
-        if (password != confirmPassword) {
+    bool Cli::_confirmPassword(cpputils::Console* console, const SensitivePassword &password) {
+        const SensitivePassword confirmPassword = console->askPassword("Confirm Password: ");
+        if (!password.equals(confirmPassword)) {
             std::cout << "Passwords don't match" << std::endl;
             return false;
         }
         return true;
     }
 
-    function<string()> Cli::_askPasswordNoninteractive(std::shared_ptr<cpputils::Console> console) {
+    function<SensitivePassword()> Cli::_askPasswordNoninteractive(std::shared_ptr<cpputils::Console> console) {
         //TODO Test
         return [console] () {
-            string password = console->askPassword("Password: ");
+            SensitivePassword password = console->askPassword("Password: ");
             if (!_checkPassword(password)) {
                 throw CryfsException("Invalid password. Password cannot be empty.", ErrorCode::EmptyPassword);
             }
@@ -220,7 +228,8 @@ namespace cryfs_cli {
           _console,
           _noninteractive ? Cli::_askPasswordNoninteractive(_console) : Cli::_askPasswordForExistingFilesystem(_console),
           _noninteractive ? Cli::_askPasswordNoninteractive(_console) : Cli::_askPasswordForNewFilesystem(_console),
-          make_unique_ref<SCrypt>(_scryptSettings)
+          make_unique_ref<SCrypt>(_scryptSettings),
+          make_unique_ref<Argon2id>(_argon2idSettings)
         );
         return CryConfigLoader(_console, _keyGenerator, std::move(keyProvider), std::move(localStateDir),
                                cipher, blocksizeBytes, missingBlockIsIntegrityViolation).loadOrCreate(std::move(configFilePath), allowFilesystemUpgrade, allowReplacedFilesystem);

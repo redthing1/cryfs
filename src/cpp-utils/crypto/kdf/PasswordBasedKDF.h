@@ -4,6 +4,7 @@
 
 #include "../../crypto/symmetric/EncryptionKey.h"
 #include "../../data/Data.h"
+#include "SensitivePassword.h"
 
 namespace cpputils {
 
@@ -16,8 +17,8 @@ namespace cpputils {
           cpputils::Data kdfParameters;
         };
 
-        virtual EncryptionKey deriveExistingKey(size_t keySize, const std::string& password, const Data& kdfParameters) = 0;
-        virtual KeyResult deriveNewKey(size_t keySize, const std::string& password) = 0;
+        virtual EncryptionKey deriveExistingKey(size_t keySize, const SensitivePassword& password, const Data& kdfParameters) = 0;
+        virtual KeyResult deriveNewKey(size_t keySize, const SensitivePassword& password) = 0;
     };
 
 }

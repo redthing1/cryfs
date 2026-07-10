@@ -7,6 +7,8 @@
 #include <cpp-utils/tempfile/TempFile.h>
 #include <cryfs/impl/config/CryConfigFile.h>
 #include <cryfs/impl/config/CryPresetPasswordBasedKeyProvider.h>
+#include <cpp-utils/crypto/kdf/Argon2id.h>
+#include <cpp-utils/crypto/kdf/Scrypt.h>
 #include "../../impl/testutils/MockConsole.h"
 
 using cpputils::Data;
@@ -28,7 +30,9 @@ public:
 
     unique_ref<CryConfigFile> loadConfigFromHex(const string &configFileContentHex) {
         storeHexToFile(configFileContentHex);
-        CryPresetPasswordBasedKeyProvider keyProvider("mypassword", make_unique_ref<SCrypt>(SCrypt::DefaultSettings));
+        CryPresetPasswordBasedKeyProvider keyProvider(
+          "mypassword", make_unique_ref<SCrypt>(SCrypt::DefaultSettings),
+          make_unique_ref<cpputils::Argon2id>(cpputils::Argon2id::TestSettings));
         return CryConfigFile::load(file.path(), &keyProvider, CryConfigFile::Access::ReadWrite).right();
     }
 

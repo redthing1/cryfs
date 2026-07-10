@@ -8,6 +8,7 @@
 #include <boost/optional.hpp>
 #include "../macros.h"
 #include "../pointer/unique_ref.h"
+#include "../crypto/kdf/SensitivePassword.h"
 
 namespace cpputils {
 
@@ -17,7 +18,7 @@ public:
     virtual unsigned int ask(const std::string &question, const std::vector<std::string> &options) = 0;
     virtual bool askYesNo(const std::string &question, bool defaultValue) = 0; // NoninteractiveConsole will just return the default value without asking the user.
     virtual void print(const std::string &output) = 0;
-    virtual std::string askPassword(const std::string &question) = 0;
+    virtual SensitivePassword askPassword(const std::string &question) = 0;
 };
 
 }

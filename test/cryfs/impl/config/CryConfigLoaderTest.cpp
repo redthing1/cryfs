@@ -9,6 +9,8 @@
 #include <cpp-utils/crypto/symmetric/ciphers.h>
 #include <cpp-utils/data/DataFixture.h>
 #include <cpp-utils/io/NoninteractiveConsole.h>
+#include <cpp-utils/crypto/kdf/Argon2id.h>
+#include <cpp-utils/crypto/kdf/Scrypt.h>
 #include <gitversion/gitversion.h>
 #include <gitversion/parser.h>
 #include <gitversion/VersionCompare.h>
@@ -66,7 +68,9 @@ private:
 class CryConfigLoaderTest: public ::testing::Test, public TestWithMockConsole, TestWithFakeHomeDirectory {
 public:
     unique_ref<CryKeyProvider> keyProvider(const string& password) {
-      return make_unique_ref<CryPresetPasswordBasedKeyProvider>(password, make_unique_ref<SCrypt>(SCrypt::TestSettings));
+      return make_unique_ref<CryPresetPasswordBasedKeyProvider>(
+        password, make_unique_ref<SCrypt>(SCrypt::TestSettings),
+        make_unique_ref<cpputils::Argon2id>(cpputils::Argon2id::TestSettings));
     }
 
     CryConfigLoaderTest(): file(false), tempLocalStateDir(), localStateDir(tempLocalStateDir.path()) {
@@ -229,8 +233,8 @@ TEST_F(CryConfigLoaderTest, DoesLoadIfSameCipher) {
 }
 
 TEST_F(CryConfigLoaderTest, DoesLoadIfSameCipher_Noninteractive) {
-    Create("mypassword", string("aes-128-gcm"), true);
-    LoadOrCreate("mypassword", string("aes-128-gcm"), true);
+    Create("mypassword", string("aes-256-gcm"), true);
+    LoadOrCreate("mypassword", string("aes-256-gcm"), true);
 }
 
 TEST_F(CryConfigLoaderTest, RootBlob_Load) {

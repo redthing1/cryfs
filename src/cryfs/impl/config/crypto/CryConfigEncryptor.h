@@ -9,6 +9,7 @@
 #include "cryfs/impl/config/crypto/inner/InnerEncryptor.h"
 #include "cryfs/impl/config/crypto/outer/OuterEncryptor.h"
 #include "cryfs/impl/config/CryCipher.h"
+#include "ConfigKdf.h"
 
 namespace cryfs {
     //TODO Use own exception for cpputils::Serializer/cpputils::Deserializer errors and only catch them
@@ -16,6 +17,7 @@ namespace cryfs {
     public:
         static constexpr size_t OuterKeySize = OuterEncryptor::Cipher::KEYSIZE;
         static constexpr size_t MaxTotalKeySize = OuterKeySize + CryCiphers::MAX_KEY_SIZE;
+        static constexpr size_t CurrentKeySize = cpputils::XChaCha20Poly1305::KEYSIZE;
 
         struct Decrypted {
             cpputils::Data data;
@@ -24,6 +26,8 @@ namespace cryfs {
         };
 
         CryConfigEncryptor(cpputils::EncryptionKey derivedKey, cpputils::Data _kdfParameters);
+        CryConfigEncryptor(cpputils::EncryptionKey derivedKey,
+                           cpputils::Data kdfParameters, ConfigKdf kdf);
 
         cpputils::Data encrypt(const cpputils::Data &plaintext, const std::string &cipherName) const;
         boost::optional<Decrypted> decrypt(const cpputils::Data &data) const;
@@ -34,6 +38,7 @@ namespace cryfs {
 
         cpputils::EncryptionKey _derivedKey;
         cpputils::Data _kdfParameters;
+        ConfigKdf _kdf;
 
         DISALLOW_COPY_AND_ASSIGN(CryConfigEncryptor);
     };

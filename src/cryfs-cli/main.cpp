@@ -3,6 +3,7 @@
 #include <cpp-utils/io/IOStreamConsole.h>
 #include <cpp-utils/network/CurlHttpClient.h>
 #include <cryfs/impl/CryfsException.h>
+#include <cpp-utils/crypto/kdf/Argon2id.h>
 
 #if defined(_MSC_VER)
 #include <VersionHelpers.h>
@@ -29,7 +30,9 @@ int main(int argc, const char *argv[]) {
     try {
         auto *keyGenerator = Random::OSRandom();
 
-        return Cli(keyGenerator, SCrypt::DefaultSettings, make_shared<IOStreamConsole>())
+        return Cli(keyGenerator, SCrypt::DefaultSettings,
+                   cpputils::Argon2id::DefaultSettings,
+                   make_shared<IOStreamConsole>())
             .main(
                 argc,
                 argv,

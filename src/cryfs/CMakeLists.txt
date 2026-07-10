@@ -10,6 +10,7 @@ set(LIB_SOURCES
         impl/config/crypto/inner/InnerConfig.cpp
         impl/config/crypto/inner/InnerEncryptor.cpp
         impl/config/crypto/CryConfigEncryptor.cpp
+        impl/config/crypto/ConfigPayload.cpp
         impl/config/CryConfigConsole.cpp
         impl/config/CryConfigLoader.cpp
         impl/config/CryConfig.cpp

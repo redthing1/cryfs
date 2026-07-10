@@ -15,25 +15,17 @@ namespace cryfs {
 #ifndef CRYFS_NO_COMPATIBILITY
     const string OuterConfig::OLD_HEADER = "cryfs.config;0;scrypt";
 #endif
-    const string OuterConfig::HEADER = "cryfs.config;1;scrypt";
-
-    void OuterConfig::_checkHeader(Deserializer *deserializer) {
-        const string header = deserializer->readString();
-        if (header != HEADER) {
-            throw std::runtime_error("Invalid header");
-        }
-    }
-
-    void OuterConfig::_writeHeader(Serializer *serializer) {
-        serializer->writeString(HEADER);
-    }
+    const string OuterConfig::SCRYPT_HEADER = "cryfs.config;1;scrypt";
+    const string OuterConfig::ARGON2ID_HEADER = "cryfs.config;2;argon2id";
 
     Data OuterConfig::serialize() const {
         try {
-            Serializer serializer(Serializer::StringSize(HEADER)
+            const auto &header = kdf == ConfigKdf::Argon2id
+                               ? ARGON2ID_HEADER : SCRYPT_HEADER;
+            Serializer serializer(Serializer::StringSize(header)
                                   + Serializer::DataSize(kdfParameters)
                                   + encryptedInnerConfig.size());
-            _writeHeader(&serializer);
+            serializer.writeString(header);
             serializer.writeData(kdfParameters);
             serializer.writeTailData(encryptedInnerConfig);
             return serializer.finished();
@@ -46,19 +38,24 @@ namespace cryfs {
     optional<OuterConfig> OuterConfig::deserialize(const Data &data) {
         Deserializer deserializer(&data);
         try {
-#ifndef CRYFS_NO_COMPATIBILITY
             const string header = deserializer.readString();
+#ifndef CRYFS_NO_COMPATIBILITY
             if (header == OLD_HEADER) {
                 return _deserializeOldFormat(&deserializer);
-            } else if (header == HEADER) {
-                return _deserializeNewFormat(&deserializer);
+            }
+#endif
+            if (header == SCRYPT_HEADER) {
+                auto result = _deserializeNewFormat(&deserializer);
+                result.wasInDeprecatedConfigFormat = true;
+                result.kdf = ConfigKdf::Scrypt;
+                return result;
+            } else if (header == ARGON2ID_HEADER) {
+                auto result = _deserializeNewFormat(&deserializer);
+                result.kdf = ConfigKdf::Argon2id;
+                return result;
             } else {
                 throw std::runtime_error("Invalid header");
             }
-#else
-            _checkHeader(&deserializer);
-            return _deserializeNewFormat(&deserializer);
-#endif
         } catch (const exception &e) {
             LOG(ERR, "Error deserializing outer configuration: {}", e.what());
             return none; // This can be caused by invalid input data and does not have to be a programming error. Don't throw exception.
@@ -71,7 +68,7 @@ namespace cryfs {
         auto kdfParametersSerialized = kdfParameters.serialize();
         auto encryptedInnerConfig = deserializer->readTailData();
         deserializer->finished();
-        return OuterConfig {std::move(kdfParametersSerialized), std::move(encryptedInnerConfig), true};
+        return OuterConfig {std::move(kdfParametersSerialized), std::move(encryptedInnerConfig), true, ConfigKdf::Scrypt};
     }
 #endif
 

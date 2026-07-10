@@ -11,12 +11,13 @@ TEST_F(ConsoleTest_AskPassword, InputSomePassword) {
   auto chosen = askPassword("Please enter my password:");
   EXPECT_OUTPUT_LINE("Please enter my password", ':');
   sendInputLine("this is the password");
-  EXPECT_EQ("this is the password", chosen.get());
+  const auto expected = cpputils::SensitivePassword::FromString("this is the password");
+  EXPECT_TRUE(chosen.get().equals(expected));
 }
 
 TEST_F(ConsoleTest_AskPassword, InputEmptyPassword) {
   auto chosen = askPassword("Please enter my password:");
   EXPECT_OUTPUT_LINE("Please enter my password", ':');
   sendInputLine("");
-  EXPECT_EQ("", chosen.get());
+  EXPECT_TRUE(chosen.get().empty());
 }

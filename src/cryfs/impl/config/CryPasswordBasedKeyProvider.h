@@ -12,16 +12,28 @@ namespace cryfs {
 // TODO Remove duplication with CryPresetPasswordBasedKeyProvider
 class CryPasswordBasedKeyProvider final : public CryKeyProvider {
 public:
-  explicit CryPasswordBasedKeyProvider(std::shared_ptr<cpputils::Console> console, std::function<std::string()> askPasswordForExistingFilesystem, std::function<std::string()> askPasswordForNewFilesystem, cpputils::unique_ref<cpputils::PasswordBasedKDF> kdf);
+  explicit CryPasswordBasedKeyProvider(
+    std::shared_ptr<cpputils::Console> console,
+    std::function<cpputils::SensitivePassword()> askPasswordForExistingFilesystem,
+    std::function<cpputils::SensitivePassword()> askPasswordForNewFilesystem,
+    cpputils::unique_ref<cpputils::PasswordBasedKDF> scrypt,
+    cpputils::unique_ref<cpputils::PasswordBasedKDF> argon2id);
 
-  cpputils::EncryptionKey requestKeyForExistingFilesystem(size_t keySize, const cpputils::Data& kdfParameters) override;
-  KeyResult requestKeyForNewFilesystem(size_t keySize) override;
+  cpputils::EncryptionKey requestKeyForExistingFilesystem(
+    ConfigKdf kdf, size_t keySize,
+    const cpputils::Data& kdfParameters) override;
+  KeyResult requestKeyForNewFilesystem(ConfigKdf kdf, size_t keySize) override;
 
 private:
   std::shared_ptr<cpputils::Console> _console;
-  std::function<std::string()> _askPasswordForExistingFilesystem;
-  std::function<std::string()> _askPasswordForNewFilesystem;
-  cpputils::unique_ref<cpputils::PasswordBasedKDF> _kdf;
+  std::function<cpputils::SensitivePassword()> _askPasswordForExistingFilesystem;
+  std::function<cpputils::SensitivePassword()> _askPasswordForNewFilesystem;
+  cpputils::PasswordBasedKDF *_kdf(ConfigKdf kdf);
+  const cpputils::SensitivePassword &_password(bool forNewFilesystem);
+
+  boost::optional<cpputils::SensitivePassword> _cachedPassword;
+  cpputils::unique_ref<cpputils::PasswordBasedKDF> _scrypt;
+  cpputils::unique_ref<cpputils::PasswordBasedKDF> _argon2id;
 
   DISALLOW_COPY_AND_ASSIGN(CryPasswordBasedKeyProvider);
 };

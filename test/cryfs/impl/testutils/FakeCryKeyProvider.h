@@ -11,17 +11,19 @@ private:
 public:
   FakeCryKeyProvider(unsigned char keySeed = 0): _keySeed(keySeed) {}
 
-  cpputils::EncryptionKey requestKeyForExistingFilesystem(size_t keySize, const cpputils::Data& kdfParameters) override {
+  cpputils::EncryptionKey requestKeyForExistingFilesystem(
+      cryfs::ConfigKdf, size_t keySize,
+      const cpputils::Data& kdfParameters) override {
     ASSERT(kdfParameters.size() == 1 && *reinterpret_cast<const unsigned char*>(kdfParameters.data()) == KDF_TEST_PARAMETERS, "Wrong kdf parameters");
 
     return cpputils::EncryptionKey::FromString(cpputils::DataFixture::generate(keySize, _keySeed).ToString());
   }
 
-  KeyResult requestKeyForNewFilesystem(size_t keySize) override {
+  KeyResult requestKeyForNewFilesystem(cryfs::ConfigKdf kdf, size_t keySize) override {
     cpputils::Data kdfParameters(sizeof(unsigned char));
     *reinterpret_cast<unsigned char*>(kdfParameters.data()) = KDF_TEST_PARAMETERS;
 
-    auto key = requestKeyForExistingFilesystem(keySize, kdfParameters);
+    auto key = requestKeyForExistingFilesystem(kdf, keySize, kdfParameters);
     return KeyResult{
         std::move(key),
         std::move(kdfParameters)

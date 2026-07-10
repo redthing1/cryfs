@@ -3,6 +3,7 @@
 #define CRYFS_CRYKEYPROVIDER_H
 
 #include <cpp-utils/crypto/symmetric/EncryptionKey.h>
+#include "crypto/ConfigKdf.h"
 
 namespace cryfs {
 
@@ -15,8 +16,10 @@ public:
     cpputils::Data kdfParameters;
   };
 
-  virtual cpputils::EncryptionKey requestKeyForExistingFilesystem(size_t keySize, const cpputils::Data& kdfParameters) = 0;
-  virtual KeyResult requestKeyForNewFilesystem(size_t keySize) = 0;
+  virtual cpputils::EncryptionKey requestKeyForExistingFilesystem(
+    ConfigKdf kdf, size_t keySize, const cpputils::Data& kdfParameters) = 0;
+  virtual KeyResult requestKeyForNewFilesystem(
+    ConfigKdf kdf, size_t keySize) = 0;
 };
 
 }

@@ -13,6 +13,8 @@
 #include <cpp-utils/system/homedir.h>
 #include "../testutils/TestWithFakeHomeDirectory.h"
 #include <cpp-utils/io/NoninteractiveConsole.h>
+#include <cpp-utils/crypto/kdf/Argon2id.h>
+#include <cpp-utils/crypto/kdf/Scrypt.h>
 
 //TODO (whole project) Make constructors explicit when implicit construction not needed
 
@@ -42,7 +44,9 @@ public:
   }
 
   shared_ptr<CryConfigFile> loadOrCreateConfig() {
-    auto keyProvider = make_unique_ref<CryPresetPasswordBasedKeyProvider>("mypassword", make_unique_ref<SCrypt>(SCrypt::TestSettings));
+    auto keyProvider = make_unique_ref<CryPresetPasswordBasedKeyProvider>(
+      "mypassword", make_unique_ref<SCrypt>(SCrypt::TestSettings),
+      make_unique_ref<cpputils::Argon2id>(cpputils::Argon2id::TestSettings));
     return CryConfigLoader(make_shared<NoninteractiveConsole>(mockConsole()), Random::Csprng(), std::move(keyProvider), localStateDir, none, none, none).loadOrCreate(config.path(), false, false).right().configFile;
   }
 

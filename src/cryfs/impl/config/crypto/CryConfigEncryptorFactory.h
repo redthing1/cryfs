@@ -2,11 +2,8 @@
 #ifndef MESSMER_CRYFS_SRC_CONFIG_CRYPTO_CRYCONFIGENCRYPTORFACTORY_H
 #define MESSMER_CRYFS_SRC_CONFIG_CRYPTO_CRYCONFIGENCRYPTORFACTORY_H
 
-#include "cryfs/impl/config/crypto/inner/ConcreteInnerEncryptor.h"
 #include "CryConfigEncryptor.h"
 #include <cpp-utils/pointer/unique_ref.h>
-#include <cpp-utils/crypto/kdf/Scrypt.h>
-#include "cryfs/impl/config/CryCipher.h"
 
 namespace cryfs {
     class CryKeyProvider;

@@ -25,9 +25,9 @@ public:
         return false;
     }
 
-    std::string askPassword(const std::string&) override {
+    cpputils::SensitivePassword askPassword(const std::string&) override {
         EXPECT_TRUE(false);
-        return "";
+        return cpputils::SensitivePassword();
     }
 
 private:

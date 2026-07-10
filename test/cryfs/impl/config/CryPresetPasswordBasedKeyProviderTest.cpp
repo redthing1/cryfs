@@ -8,6 +8,7 @@ using cpputils::EncryptionKey;
 using cpputils::PasswordBasedKDF;
 using cpputils::Data;
 using cpputils::DataFixture;
+using cpputils::SensitivePassword;
 using std::string;
 using cryfs::CryPresetPasswordBasedKeyProvider;
 using testing::Invoke;
@@ -18,8 +19,8 @@ namespace {
 
 class MockKDF : public PasswordBasedKDF {
 public:
-    MOCK_METHOD(EncryptionKey, deriveExistingKey, (size_t keySize, const string& password, const Data& kdfParameters), (override));
-    MOCK_METHOD(KeyResult, deriveNewKey, (size_t keySize, const string& password), (override));
+    MOCK_METHOD(EncryptionKey, deriveExistingKey, (size_t keySize, const SensitivePassword& password, const Data& kdfParameters), (override));
+    MOCK_METHOD(KeyResult, deriveNewKey, (size_t keySize, const SensitivePassword& password), (override));
 };
 
 TEST(CryPresetPasswordBasedKeyProviderTest, requestKeyForNewFilesystem) {
@@ -29,10 +30,16 @@ TEST(CryPresetPasswordBasedKeyProviderTest, requestKeyForNewFilesystem) {
     auto kdf = make_unique_ref<MockKDF>();
     const Data kdfParameters = DataFixture::generate(100);
 
-    EXPECT_CALL(*kdf, deriveNewKey(Eq(keySize), StrEq(password))).Times(1).WillOnce(Invoke([&] (auto, auto) {return PasswordBasedKDF::KeyResult{key, kdfParameters.copy()};}));
+    EXPECT_CALL(*kdf, deriveNewKey(Eq(keySize), testing::_)).Times(1).WillOnce(Invoke([&] (auto, const SensitivePassword& suppliedPassword) {
+        const auto expected = SensitivePassword::FromString(password);
+        EXPECT_TRUE(suppliedPassword.equals(expected));
+        return PasswordBasedKDF::KeyResult{key, kdfParameters.copy()};
+    }));
 
-    CryPresetPasswordBasedKeyProvider keyProvider(password, std::move(kdf));
-    auto returned_key = keyProvider.requestKeyForNewFilesystem(keySize);
+    CryPresetPasswordBasedKeyProvider keyProvider(
+      password, make_unique_ref<testing::NiceMock<MockKDF>>(), std::move(kdf));
+    auto returned_key = keyProvider.requestKeyForNewFilesystem(
+      cryfs::ConfigKdf::Argon2id, keySize);
 
     EXPECT_EQ(key.ToString(), returned_key.key.ToString());
     EXPECT_EQ(kdfParameters, returned_key.kdfParameters);
@@ -45,13 +52,17 @@ TEST(CryPresetPasswordBasedKeyProviderTest, requestKeyForExistingFilesystem) {
     auto kdf = make_unique_ref<MockKDF>();
     const Data kdfParameters = DataFixture::generate(100);
 
-    EXPECT_CALL(*kdf, deriveExistingKey(Eq(keySize), StrEq(password), testing::_)).Times(1).WillOnce(Invoke([&] (auto, auto, const auto& kdfParams) {
+    EXPECT_CALL(*kdf, deriveExistingKey(Eq(keySize), testing::_, testing::_)).Times(1).WillOnce(Invoke([&] (auto, const SensitivePassword& suppliedPassword, const auto& kdfParams) {
+        const auto expected = SensitivePassword::FromString(password);
+        EXPECT_TRUE(suppliedPassword.equals(expected));
         EXPECT_EQ(kdfParameters, kdfParams);
         return key;
     }));
 
-    CryPresetPasswordBasedKeyProvider keyProvider(password, std::move(kdf));
-    const EncryptionKey returned_key = keyProvider.requestKeyForExistingFilesystem(keySize, kdfParameters);
+    CryPresetPasswordBasedKeyProvider keyProvider(
+      password, make_unique_ref<testing::NiceMock<MockKDF>>(), std::move(kdf));
+    const EncryptionKey returned_key = keyProvider.requestKeyForExistingFilesystem(
+      cryfs::ConfigKdf::Argon2id, keySize, kdfParameters);
 
     EXPECT_EQ(key.ToString(), returned_key.ToString());
 }

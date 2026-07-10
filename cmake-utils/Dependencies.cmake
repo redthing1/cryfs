@@ -20,6 +20,13 @@ find_package(spdlog REQUIRED)
 add_library(CryfsDependencies_spdlog INTERFACE)
 target_link_libraries(CryfsDependencies_spdlog INTERFACE spdlog::spdlog)
 
+# Setup Argon2 dependency
+find_path(ARGON2_INCLUDE_DIR NAMES argon2.h REQUIRED)
+find_library(ARGON2_LIBRARY NAMES argon2 REQUIRED)
+add_library(CryfsDependencies_argon2 INTERFACE)
+target_include_directories(CryfsDependencies_argon2 INTERFACE ${ARGON2_INCLUDE_DIR})
+target_link_libraries(CryfsDependencies_argon2 INTERFACE ${ARGON2_LIBRARY})
+
 if (CRYFS_UPDATE_CHECKS)
     # Setup libcurl dependency
     find_package(CURL REQUIRED)

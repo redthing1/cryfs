@@ -5,7 +5,10 @@ set(SOURCES
         crypto/symmetric/testutils/FakeAuthenticatedCipher.cpp
         crypto/kdf/Scrypt.cpp
         crypto/kdf/SCryptParameters.cpp
+        crypto/kdf/Argon2id.cpp
+        crypto/kdf/Argon2idParameters.cpp
         crypto/kdf/PasswordBasedKDF.cpp
+        crypto/kdf/SensitivePassword.cpp
         crypto/RandomPadding.cpp
         crypto/symmetric/EncryptionKey.cpp
         crypto/hash/Hash.cpp
@@ -71,7 +74,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 
 target_link_libraries(${PROJECT_NAME} PUBLIC ${CMAKE_DL_LIBS})
 
-target_link_libraries(${PROJECT_NAME} PUBLIC CryfsDependencies_spdlog cryfs_vendor_cryptopp CryfsDependencies_range-v3)
+target_link_libraries(${PROJECT_NAME} PUBLIC CryfsDependencies_spdlog cryfs_vendor_cryptopp CryfsDependencies_range-v3 CryfsDependencies_argon2)
 if(CRYFS_UPDATE_CHECKS)
     target_compile_definitions(${PROJECT_NAME} PUBLIC -DCRYFS_UPDATE_CHECKS)
     target_link_libraries(${PROJECT_NAME} PUBLIC CryfsDependencies_libcurl)

@@ -59,6 +59,7 @@ public:
   Data &&FillWithZeroes() &&;
 
   void StoreToFile(const boost::filesystem::path &filepath) const;
+  void StoreToFileAtomically(const boost::filesystem::path &filepath) const;
   static boost::optional<Data> LoadFromFile(const boost::filesystem::path &filepath);
 
   //TODO Test LoadFromStream/StoreToStream

@@ -2,6 +2,8 @@
 #include <boost/filesystem.hpp>
 #include <cryfs/impl/config/CryConfigLoader.h>
 #include <cryfs/impl/config/CryPasswordBasedKeyProvider.h>
+#include <cpp-utils/crypto/kdf/Argon2id.h>
+#include <cpp-utils/crypto/kdf/Scrypt.h>
 #include <blockstore/implementations/ondisk/OnDiskBlockStore2.h>
 #include <blockstore/implementations/readonly/ReadOnlyBlockStore2.h>
 #include <blockstore/implementations/integrity/IntegrityBlockStore2.h>
@@ -189,7 +191,8 @@ int main(int argc, char* argv[]) {
         console,
         askPassword,
         askPassword,
-        make_unique_ref<SCrypt>(SCrypt::DefaultSettings)
+        make_unique_ref<SCrypt>(SCrypt::DefaultSettings),
+        make_unique_ref<cpputils::Argon2id>(cpputils::Argon2id::DefaultSettings)
     );
 
     auto config_path = basedir / "cryfs.config";

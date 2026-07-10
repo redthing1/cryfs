@@ -21,7 +21,7 @@ unsigned int NoninteractiveConsole::ask(const string &/*question*/, const vector
     throw std::logic_error("Tried to ask a multiple choice question in noninteractive mode");
 }
 
-string NoninteractiveConsole::askPassword(const string &question) {
+SensitivePassword NoninteractiveConsole::askPassword(const string &question) {
     return _baseConsole->askPassword(question);
 }
 

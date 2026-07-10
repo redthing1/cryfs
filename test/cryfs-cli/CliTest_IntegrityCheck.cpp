@@ -2,6 +2,7 @@
 #include <cryfs/impl/config/CryConfigFile.h>
 #include <cryfs/impl/ErrorCodes.h>
 #include <cpp-utils/crypto/kdf/Scrypt.h>
+#include <cpp-utils/crypto/kdf/Argon2id.h>
 #include <cpp-utils/data/DataFixture.h>
 #include <cpp-utils/tempfile/TempDir.h>
 #include <blockstore/implementations/caching/CachingBlockStore2.h>
@@ -53,12 +54,25 @@ void recursive_copy(const bf::path &src, const bf::path &dst) {
 }
 
 class FakeCryKeyProvider final : public CryKeyProvider {
-  EncryptionKey requestKeyForExistingFilesystem(size_t keySize, const Data &kdfParameters) override {
-    return SCrypt(SCrypt::TestSettings).deriveExistingKey(keySize, "pass", kdfParameters);
+  EncryptionKey requestKeyForExistingFilesystem(
+      cryfs::ConfigKdf kdf, size_t keySize,
+      const Data &kdfParameters) override {
+    auto password = cpputils::SensitivePassword::FromString("pass");
+    if (kdf == cryfs::ConfigKdf::Scrypt) {
+      return SCrypt(SCrypt::TestSettings).deriveExistingKey(
+        keySize, password, kdfParameters);
+    }
+    return cpputils::Argon2id(cpputils::Argon2id::TestSettings)
+      .deriveExistingKey(keySize, password, kdfParameters);
   }
 
-  KeyResult requestKeyForNewFilesystem(size_t keySize) override {
-    auto derived = SCrypt(SCrypt::TestSettings).deriveNewKey(keySize, "pass");
+  KeyResult requestKeyForNewFilesystem(
+      cryfs::ConfigKdf kdf, size_t keySize) override {
+    auto password = cpputils::SensitivePassword::FromString("pass");
+    auto derived = kdf == cryfs::ConfigKdf::Scrypt
+      ? SCrypt(SCrypt::TestSettings).deriveNewKey(keySize, password)
+      : cpputils::Argon2id(cpputils::Argon2id::TestSettings)
+          .deriveNewKey(keySize, password);
     return {
         std::move(derived.key),
         std::move(derived.kdfParameters)

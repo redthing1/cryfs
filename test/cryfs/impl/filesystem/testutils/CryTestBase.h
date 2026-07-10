@@ -6,6 +6,7 @@
 #include <cryfs/impl/filesystem/CryNode.h>
 #include <cryfs/impl/filesystem/CryOpenFile.h>
 #include <cryfs/impl/config/CryPresetPasswordBasedKeyProvider.h>
+#include <cpp-utils/crypto/kdf/Argon2id.h>
 #include <blockstore/implementations/inmemory/InMemoryBlockStore2.h>
 #include <cpp-utils/tempfile/TempFile.h>
 #include <cpp-utils/crypto/kdf/Scrypt.h>
@@ -31,7 +32,10 @@ public:
         config.SetCipher("aes-256-gcm");
         config.SetEncryptionKey(cpputils::AES256_GCM::EncryptionKey::CreateKey(cpputils::Random::Csprng(), cpputils::AES256_GCM::KEYSIZE));
         config.SetBlocksizeBytes(10240);
-        cryfs::CryPresetPasswordBasedKeyProvider keyProvider("mypassword", cpputils::make_unique_ref<cpputils::SCrypt>(cpputils::SCrypt::TestSettings));
+        cryfs::CryPresetPasswordBasedKeyProvider keyProvider(
+          "mypassword",
+          cpputils::make_unique_ref<cpputils::SCrypt>(cpputils::SCrypt::TestSettings),
+          cpputils::make_unique_ref<cpputils::Argon2id>(cpputils::Argon2id::TestSettings));
         return cryfs::CryConfigFile::create(_configFile.path(), std::move(config), &keyProvider);
     }
 

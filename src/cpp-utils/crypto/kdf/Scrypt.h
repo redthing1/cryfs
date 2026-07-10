@@ -27,8 +27,8 @@ namespace cpputils {
 
         explicit SCrypt(const SCryptSettings& settingsForNewKeys);
 
-        EncryptionKey deriveExistingKey(size_t keySize, const std::string& password, const Data& kdfParameters) override;
-        KeyResult deriveNewKey(size_t keySize, const std::string& password) override;
+        EncryptionKey deriveExistingKey(size_t keySize, const SensitivePassword& password, const Data& kdfParameters) override;
+        KeyResult deriveNewKey(size_t keySize, const SensitivePassword& password) override;
 
     private:
         SCryptSettings _settingsForNewKeys;

@@ -2,6 +2,7 @@
 #include <cryfs/impl/config/crypto/CryConfigEncryptorFactory.h>
 #include <cpp-utils/crypto/symmetric/ciphers.h>
 #include <cpp-utils/data/DataFixture.h>
+#include <cryfs/impl/config/crypto/outer/OuterConfig.h>
 #include "../../../impl/testutils/FakeCryKeyProvider.h"
 
 using cpputils::AES256_GCM;
@@ -29,6 +30,18 @@ TEST_F(CryConfigEncryptorFactoryTest, EncryptAndDecrypt_SameEncryptor) {
     const Data encrypted = encryptor->encrypt(DataFixture::generate(400), AES256_GCM::NAME);
     auto decrypted = encryptor->decrypt(encrypted).value();
     EXPECT_EQ(DataFixture::generate(400), decrypted.data);
+}
+
+TEST_F(CryConfigEncryptorFactoryTest, NewConfigsUseArgon2idEnvelope) {
+    FakeCryKeyProvider keyProvider;
+    auto encryptor = CryConfigEncryptorFactory::deriveNewKey(&keyProvider);
+
+    const auto encrypted = encryptor->encrypt(
+      DataFixture::generate(400), AES256_GCM::NAME);
+    const auto outer = OuterConfig::deserialize(encrypted).value();
+
+    EXPECT_EQ(ConfigKdf::Argon2id, outer.kdf);
+    EXPECT_FALSE(outer.wasInDeprecatedConfigFormat);
 }
 
 TEST_F(CryConfigEncryptorFactoryTest, EncryptAndDecrypt_NewEncryptor) {
