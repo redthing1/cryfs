@@ -18,7 +18,7 @@ namespace cryfs {
 
         static constexpr const char *DEFAULT_CIPHER = "xchacha20-poly1305";
         static constexpr uint32_t DEFAULT_BLOCKSIZE_BYTES = 16 * 1024; // 16KB
-        static constexpr uint32_t DEFAULT_MISSINGBLOCKISINTEGRITYVIOLATION = false;
+        static constexpr uint32_t DEFAULT_MISSINGBLOCKISINTEGRITYVIOLATION = true;
 
     private:
 

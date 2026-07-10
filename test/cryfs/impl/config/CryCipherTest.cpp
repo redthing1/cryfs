@@ -110,6 +110,12 @@ TEST_F(CryCipherTest, SupportedCipherNamesContainsACipher) {
   EXPECT_NE(supportedCipherNames.end(), find(supportedCipherNames.begin(), supportedCipherNames.end(), "aes-256-gcm"));
 }
 
+TEST_F(CryCipherTest, NewFilesystemsOnlyOfferModernAuthenticatedCiphers) {
+  EXPECT_THAT(
+    CryCiphers::creatableCipherNames(),
+    testing::ElementsAre("xchacha20-poly1305", "aes-256-gcm"));
+}
+
 TEST_F(CryCipherTest, ThereIsACipherWithoutWarning) {
     EXPECT_EQ(none, CryCiphers::find("aes-256-gcm").warning());
 }

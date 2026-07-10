@@ -26,7 +26,7 @@ using ::testing::NiceMock;
 #define EXPECT_DOES_NOT_ASK_TO_USE_DEFAULT_SETTINGS()                                                                  \
   EXPECT_CALL(*console, askYesNo("Use default settings?", true)).Times(0)
 #define EXPECT_ASK_FOR_CIPHER()                                                                                        \
-  EXPECT_CALL(*console, ask(HasSubstr("block cipher"), UnorderedElementsAreArray(CryCiphers::supportedCipherNames()))).Times(1)
+  EXPECT_CALL(*console, ask(HasSubstr("block cipher"), UnorderedElementsAreArray(CryCiphers::creatableCipherNames()))).Times(1)
 #define EXPECT_DOES_NOT_ASK_FOR_CIPHER()                                                                               \
   EXPECT_CALL(*console, ask(HasSubstr("block cipher"), testing::_)).Times(0)
 #define EXPECT_ASK_FOR_BLOCKSIZE()                                                                                     \
@@ -34,11 +34,11 @@ using ::testing::NiceMock;
 #define EXPECT_DOES_NOT_ASK_FOR_BLOCKSIZE()                                                                            \
   EXPECT_CALL(*console, ask(HasSubstr("block size"), testing::_)).Times(0)
 #define EXPECT_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION()                                                              \
-  EXPECT_CALL(*console, askYesNo(HasSubstr("missing block"), false)).Times(1)
+  EXPECT_CALL(*console, askYesNo(HasSubstr("missing block"), true)).Times(1)
 #define EXPECT_DOES_NOT_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION()                                                     \
-  EXPECT_CALL(*console, askYesNo(HasSubstr("missing block"), false)).Times(0)
+  EXPECT_CALL(*console, askYesNo(HasSubstr("missing block"), true)).Times(0)
 #define IGNORE_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION()                                                              \
-  EXPECT_CALL(*console, askYesNo(HasSubstr("missing block"), false))
+  EXPECT_CALL(*console, askYesNo(HasSubstr("missing block"), true))
 
 class CryConfigCreatorTest: public ::testing::Test, TestWithFakeHomeDirectory {
 public:
@@ -154,15 +154,6 @@ TEST_F(CryConfigCreatorTest, ChoosesEmptyRootBlobId) {
     EXPECT_EQ("", config.RootBlob()); // This tells CryFS to create a new root blob
 }
 
-TEST_F(CryConfigCreatorTest, ChoosesValidEncryptionKey_448) {
-    AnswerNoToDefaultSettings();
-    IGNORE_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
-    EXPECT_ASK_FOR_CIPHER().WillOnce(ChooseCipher("mars-448-gcm"));
-    const CryConfig config = creator.create(none, none, none, false).config;
-    // Verify key has the correct size for Mars-448-GCM
-    EXPECT_EQ(cpputils::Mars448_GCM::KEYSIZE, config.EncryptionKey().binaryLength());
-}
-
 TEST_F(CryConfigCreatorTest, ChoosesValidEncryptionKey_256) {
     AnswerNoToDefaultSettings();
     IGNORE_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
@@ -170,15 +161,6 @@ TEST_F(CryConfigCreatorTest, ChoosesValidEncryptionKey_256) {
     const CryConfig config = creator.create(none, none, none, false).config;
     // Verify key has the correct size for AES-256-GCM
     EXPECT_EQ(cpputils::AES256_GCM::KEYSIZE, config.EncryptionKey().binaryLength());
-}
-
-TEST_F(CryConfigCreatorTest, ChoosesValidEncryptionKey_128) {
-    AnswerNoToDefaultSettings();
-    IGNORE_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION();
-    EXPECT_ASK_FOR_CIPHER().WillOnce(ChooseCipher("aes-128-gcm"));
-    const CryConfig config = creator.create(none, none, none, false).config;
-    // Verify key has the correct size for AES-128-GCM
-    EXPECT_EQ(cpputils::AES128_GCM::KEYSIZE, config.EncryptionKey().binaryLength());
 }
 
 TEST_F(CryConfigCreatorTest, DoesNotAskForAnythingIfEverythingIsSpecified) {
@@ -200,6 +182,11 @@ TEST_F(CryConfigCreatorTest, SetsCorrectLastOpenedWithVersion) {
 TEST_F(CryConfigCreatorTest, SetsCorrectVersion) {
     const CryConfig config = noninteractiveCreator.create(none, none, none, false).config;
     EXPECT_EQ(CryConfig::FilesystemFormatVersion, config.Version());
+}
+
+TEST_F(CryConfigCreatorTest, EnablesMissingBlockIntegrityByDefault) {
+    const CryConfig config = noninteractiveCreator.create(none, none, none, false).config;
+    EXPECT_TRUE(config.ExclusiveClientId() != none);
 }
 
 //TODO Add test cases ensuring that the values entered are correctly taken

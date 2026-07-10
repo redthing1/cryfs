@@ -24,7 +24,7 @@ namespace cryfs {
     }
 
     string CryConfigConsole::_askCipher() const {
-        vector<string> ciphers = CryCiphers::supportedCipherNames();
+        vector<string> ciphers = CryCiphers::creatableCipherNames();
         string cipherName = "";
         bool askAgain = true;
         while(askAgain) {
@@ -77,7 +77,7 @@ namespace cryfs {
     }
 
     bool CryConfigConsole::_askMissingBlockIsIntegrityViolation() const {
-        return _console->askYesNo("\nMost integrity checks are enabled by default. However, by default CryFS does not treat missing blocks as integrity violations.\nThat is, if CryFS finds a block missing, it will assume that this is due to a synchronization delay and not because an attacker deleted the block.\nIf you are in a single-client setting, you can let it treat missing blocks as integrity violations, which will ensure that you notice if an attacker deletes one of your files.\nHowever, in this case, you will not be able to use the file system with other devices anymore.\nDo you want to treat missing blocks as integrity violations?", false);
+        return _console->askYesNo("\nCryFS can detect missing blocks as integrity violations. This protects against an attacker deleting data, but requires single-client use. Disable this only if you need to synchronize and open the filesystem from multiple devices.\nDo you want to treat missing blocks as integrity violations?", true);
     }
 
     bool CryConfigConsole::_checkUseDefaultSettings() {

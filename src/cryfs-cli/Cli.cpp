@@ -324,8 +324,13 @@ namespace cryfs_cli {
             throw; // CryfsException is only thrown if setup goes wrong. Throw it through so that we get the correct process exit code.
         } catch (const std::exception &e) {
             LOG(ERR, "Crashed: {}", e.what());
+            throw CryfsException(
+              string("Filesystem operation failed: ") + e.what(),
+              ErrorCode::UnspecifiedError);
         } catch (...) {
             LOG(ERR, "Crashed");
+            throw CryfsException(
+              "Filesystem operation failed.", ErrorCode::UnspecifiedError);
         }
     }
 
@@ -463,7 +468,7 @@ namespace cryfs_cli {
             #ifdef CRYFS_UPDATE_CHECKS
             _maybeCheckForUpdates(std::move(httpClient));
             #endif
-            const ProgramOptions options = program_options::Parser(argc, argv).parse(CryCiphers::supportedCipherNames());
+            const ProgramOptions options = program_options::Parser(argc, argv).parse(CryCiphers::creatableCipherNames());
             _sanityChecks(options);
             _runFilesystem(options, std::move(onMounted));
         } catch (const CryfsException &e) {

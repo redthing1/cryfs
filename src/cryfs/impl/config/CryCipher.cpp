@@ -103,3 +103,11 @@ const vector<string>& CryCiphers::supportedCipherNames() {
 	static const vector<string> supportedCipherNames = _buildSupportedCipherNames();
 	return supportedCipherNames;
 }
+
+const vector<string>& CryCiphers::creatableCipherNames() {
+    static const vector<string> names = {
+        XChaCha20Poly1305::NAME,
+        AES256_GCM::NAME,
+    };
+    return names;
+}

@@ -50,7 +50,7 @@ namespace cryfs {
 
     string CryConfigCreator::_generateCipher(const optional<string> &cipherFromCommandLine) {
         if (cipherFromCommandLine != none) {
-            ASSERT(std::find(CryCiphers::supportedCipherNames().begin(), CryCiphers::supportedCipherNames().end(), *cipherFromCommandLine) != CryCiphers::supportedCipherNames().end(), "Invalid cipher");
+            ASSERT(std::find(CryCiphers::creatableCipherNames().begin(), CryCiphers::creatableCipherNames().end(), *cipherFromCommandLine) != CryCiphers::creatableCipherNames().end(), "Cipher is not available for new filesystems");
             return *cipherFromCommandLine;
         } else {
             return _configConsole.askCipher();
