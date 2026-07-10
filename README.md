@@ -97,6 +97,7 @@ Requirements
   - libFUSE version >= 2.9 (including development headers), on Mac OS X instead install macFUSE from https://osxfuse.github.io/
   - Python >= 3.5
   - OpenMP
+  - libargon2 development files
   - GTest/GMock development files if building tests
   - libcurl development files only if building with `CRYFS_UPDATE_CHECKS=ON`
 
@@ -105,15 +106,15 @@ You can use the following commands to install these requirements
     # Ubuntu
     $ sudo apt install git python3 g++ cmake ninja-build libomp-dev pkg-config libfuse-dev fuse \
         libboost-filesystem-dev libboost-thread-dev libboost-chrono-dev libboost-program-options-dev \
-        librange-v3-dev libspdlog-dev libgtest-dev libgmock-dev
+        librange-v3-dev libspdlog-dev libgtest-dev libgmock-dev libargon2-dev
 
     # Fedora
     $ sudo dnf install git python3 gcc-c++ cmake ninja-build pkgconf fuse-devel libomp-devel \
-        boost-devel range-v3-devel spdlog-devel gtest-devel gmock-devel
+        boost-devel range-v3-devel spdlog-devel gtest-devel gmock-devel libargon2-devel
 
     # Macintosh
     # TODO Update the package list
-    $ brew install cmake ninja pkg-config libomp macfuse boost range-v3 spdlog googletest
+    $ brew install cmake ninja pkg-config libomp macfuse boost range-v3 spdlog googletest argon2
 
 Build & Install
 ---------------
@@ -156,8 +157,18 @@ Run benchmarks
 Use the benchmark preset:
 
     $ cmake --preset bench
-    $ cmake --build --preset bench --target cryfs-bench
+    $ cmake --build --preset bench --target cryfs-bench cryfs-kdf-bench
     $ build/bench/bench/cryfs-bench
+    $ build/bench/bench/cryfs-kdf-bench
+
+The `cryfs-kdf-bench` target measures the Argon2id config-key preset. Its
+defaults match CryFS, and `--memory-kib`, `--iterations`, and `--parallelism`
+can be used to compare settings on a target desktop.
+
+Password-protected config files created by this version use Argon2id v19 with
+1 GiB of memory, three iterations, and four lanes. Successfully opened legacy
+scrypt configs are atomically rewrapped with Argon2id in read-write mode;
+read-only tools leave them unchanged.
 
 Building on Windows (experimental)
 ----------------------------------
